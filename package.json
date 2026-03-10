@@ -1,0 +1,80 @@
+{
+	"name": "masonry-blade",
+	"version": "0.0.0",
+	"private": false,
+	"description": "Algo-oriented lib for create masonry grid",
+	"keywords": [
+		"generate",
+		"lib",
+		"masonry"
+	],
+	"homepage": "https://github.com/steelWinds/masonry-blade",
+	"bugs": {
+		"url": "https://github.com/steelWinds/masonry-blade/issues",
+		"email": "kirillsurov0@gmail.com"
+	},
+	"license": "MPL-2.0",
+	"author": "steelWinds",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/steelWinds/masonry-blade"
+	},
+	"files": [
+		"build",
+		"README.md",
+		"LICENSE"
+	],
+	"os": [
+		"darwin",
+		"linux",
+		"win32"
+	],
+	"type": "module",
+	"main": "./build/masonry-blade.mjs",
+	"scripts": {
+		"build": "genversion lib/version.js --esm --strict && tsdown --env-file .env.production --minify --log-level error",
+		"build:dev": "genversion lib/version.js --esm --strict && tsdown --env-file .env.development --sourcemap",
+		"build:watch": "genversion lib/version.js --esm --strict && tsdown --env-file .env.development --sourcemap --watch",
+		"benchmark": "cross-env NODE_OPTIONS='--expose-gc --max-old-space-size=8192' tsx --inspect benchmark/bench.ts",
+		"test": "vitest",
+		"test:run": "vitest run --testTimeout 0",
+		"test:coverage": "vitest run --coverage",
+		"lint": "oxlint --type-aware",
+		"lint:fix": "oxlint --fix",
+		"nano-staged": "nano-staged",
+		"fmt": "oxfmt",
+		"fmt:check": "oxfmt --check",
+		"prepare": "husky"
+	},
+	"devDependencies": {
+		"@faker-js/faker": "^10.2.0",
+		"@types/node": "^25.3.5",
+		"@vitest/coverage-v8": "^4.0.17",
+		"cross-env": "^10.1.0",
+		"genversion": "^3.2.0",
+		"husky": "^9.1.7",
+		"nano-staged": "^0.9.0",
+		"oxfmt": "^0.35.0",
+		"oxlint": "^1.42.0",
+		"oxlint-tsgolint": "^0.16.0",
+		"tinybench": "^6.0.0",
+		"tsdown": "0.20.3",
+		"tsdown-plugin-worker": "^0.1.9",
+		"tsx": "^4.21.0",
+		"typescript": "~5.9.3",
+		"vitest": "^4.0.17"
+	},
+	"overrides": {
+		"tsdown": "0.20.3"
+	},
+	"nano-staged": {
+		"*": "oxfmt --no-error-on-unmatched-pattern",
+		"*.{js,jsx,ts,tsx,mjs,cjs}": [
+			"pnpm run lint",
+			"pnpm run test:run --passWithNoTests"
+		]
+	},
+	"engines": {
+		"node": ">=18.0.0"
+	}
+}
