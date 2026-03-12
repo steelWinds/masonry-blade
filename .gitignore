@@ -17,9 +17,6 @@ coverage
 .env.*
 !.env.*.example
 
-# For genversion
-lib
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
