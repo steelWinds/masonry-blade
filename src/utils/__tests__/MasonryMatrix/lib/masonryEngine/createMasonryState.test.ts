@@ -1,121 +1,103 @@
-import type { MasonryItem, MasonryState } from 'src/utils/MasonryMatrix/lib/masonryEngine/types.ts';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { faker } from '@faker-js/faker';
-import { FAKER_SEED } from 'lib/constants.ts'
+import { describe, expect, test } from 'vitest';
+
 import { createMasonryState } from 'src/utils/MasonryMatrix/lib/masonryEngine/createMasonryState.ts';
 
-
-const createItem = (): MasonryItem => ({
-  id: faker.string.uuid(),
-  src: faker.internet.url(),
-  width: faker.number.int({ min: 50, max: 500 }),
-  height: faker.number.int({ min: 50, max: 500 }),
-});
-
-const createEmptyState = (): MasonryState => ({
-  count: 0,
-  width: 0,
-  columns: [],
-  heights: [],
-  order: [],
-});
-
 describe('createMasonryState', () => {
-  beforeEach(() => {
-    faker.seed(FAKER_SEED);
-  });
+	test('creates state with default count = 1', () => {
+		const result = createMasonryState(960);
 
-  it('creates an initialized state for a positive column count', () => {
-    const count = 3;
-    const rootWidth = 305;
+		expect(result.count).toBe(1);
+		expect(result.width).toBe(960);
+		expect(result.columns).toEqual([[]]);
+		expect(Array.from(result.heights)).toEqual([0]);
+		expect(Array.from(result.order)).toEqual([0]);
 
-    const result = createMasonryState(count, rootWidth);
+		expect(result.heights).toBeInstanceOf(Int32Array);
+		expect(result.order).toBeInstanceOf(Int16Array);
+	});
 
-    expect(result).toStrictEqual({
-      count: 3,
-      width: 101,
-      columns: [[], [], []],
-      heights: [0, 0, 0],
-      order: [0, 1, 2],
-    });
-  });
+	test('creates state with the requested column count', () => {
+		const result = createMasonryState(900, 3);
 
-  it.each([0, -1, -10])('returns an empty state when count is %i', (count) => {
-    const rootWidth = faker.number.int({ min: 100, max: 1000 });
+		expect(result.count).toBe(3);
+		expect(result.width).toBe(300);
+		expect(result.columns).toHaveLength(3);
+		expect(result.columns).toEqual([[], [], []]);
+		expect(Array.from(result.heights)).toEqual([0, 0, 0]);
+		expect(Array.from(result.order)).toEqual([0, 1, 2]);
+	});
 
-    const result = createMasonryState(count, rootWidth);
+	test('uses floor division when rootWidth is not divisible by count', () => {
+		const result = createMasonryState(1000, 3);
 
-    expect(result).toStrictEqual(createEmptyState());
-  });
+		expect(result.width).toBe(Math.floor(1000 / 3));
+		expect(result.width).toBe(333);
+	});
 
-  it('uses the default count when count is undefined', () => {
-    const rootWidth = faker.number.int({ min: 100, max: 1000 });
+	test('returns width = 0 when count is 0', () => {
+		const result = createMasonryState(1000, 0);
 
-    const result = createMasonryState(undefined, rootWidth);
+		expect(result.count).toBe(0);
+		expect(result.width).toBe(0);
+		expect(result.columns).toEqual([]);
+		expect(Array.from(result.heights)).toEqual([]);
+		expect(Array.from(result.order)).toEqual([]);
+	});
 
-    expect(result).toStrictEqual({
-      count: 1,
-      width: rootWidth,
-      columns: [[]],
-      heights: [0],
-      order: [0],
-    });
-  });
+	test('initializes order as a sequence from 0 to count - 1', () => {
+		const result = createMasonryState(1200, 5);
 
-  it('floors the column width when rootWidth is not divisible by count', () => {
-    const count = 4;
-    const rootWidth = 403;
+		expect(Array.from(result.order)).toEqual([0, 1, 2, 3, 4]);
+	});
 
-    const result = createMasonryState(count, rootWidth);
+	test('creates a separate array for each column', () => {
+		const result = createMasonryState(1200, 3);
 
-    expect(result.width).toBe(100);
-  });
+		expect(result.columns[0]).not.toBe(result.columns[1]);
+		expect(result.columns[1]).not.toBe(result.columns[2]);
+		expect(result.columns[0]).not.toBe(result.columns[2]);
 
-  it('returns zero width when rootWidth is smaller than count', () => {
-    const count = 5;
-    const rootWidth = 3;
+		result.columns[0].push({
+			height: 300,
+			id: 'item-1',
+			src: 'https://example.com/image.jpg',
+			width: 400,
+		});
 
-    const result = createMasonryState(count, rootWidth);
+		expect(result.columns[0]).toHaveLength(1);
+		expect(result.columns[1]).toHaveLength(0);
+		expect(result.columns[2]).toHaveLength(0);
+	});
 
-    expect(result).toStrictEqual({
-      count: 5,
-      width: 0,
-      columns: [[], [], [], [], []],
-      heights: [0, 0, 0, 0, 0],
-      order: [0, 1, 2, 3, 4],
-    });
-  });
+	test('returns fresh independent structures on each call', () => {
+		const first = createMasonryState(800, 2);
+		const second = createMasonryState(800, 2);
 
-  it('creates independent column arrays', () => {
-    const state = createMasonryState(2, 400);
-    const item = createItem();
+		expect(first).not.toBe(second);
+		expect(first.columns).not.toBe(second.columns);
+		expect(first.heights).not.toBe(second.heights);
+		expect(first.order).not.toBe(second.order);
 
-    state.columns[0].push(item);
+		first.columns[0].push({
+			height: 200,
+			id: 'item-1',
+			src: 'https://example.com/image.jpg',
+			width: 400,
+		});
+		first.heights[0] = 123;
+		first.order[0] = 1;
 
-    expect(state.columns[0]).toStrictEqual([item]);
-    expect(state.columns[1]).toStrictEqual([]);
-    expect(state.columns[0]).not.toBe(state.columns[1]);
-  });
+		expect(second.columns).toEqual([[], []]);
+		expect(Array.from(second.heights)).toEqual([0, 0]);
+		expect(Array.from(second.order)).toEqual([0, 1]);
+	});
 
-  it('returns a new independent state for each call', () => {
-    const firstState = createMasonryState(2, 400);
-    const secondState = createMasonryState(2, 400);
+	test('creates typed arrays with lengths equal to count', () => {
+		const result = createMasonryState(1400, 4);
 
-    firstState.columns[0].push(createItem());
-    firstState.heights[0] = 123;
-    firstState.order[0] = 1;
-
-    expect(secondState).toStrictEqual({
-      count: 2,
-      width: 200,
-      columns: [[], []],
-      heights: [0, 0],
-      order: [0, 1],
-    });
-
-    expect(firstState).not.toBe(secondState);
-    expect(firstState.columns).not.toBe(secondState.columns);
-    expect(firstState.heights).not.toBe(secondState.heights);
-    expect(firstState.order).not.toBe(secondState.order);
-  });
+		expect(result.heights).toBeInstanceOf(Int32Array);
+		expect(result.order).toBeInstanceOf(Int16Array);
+		expect(result.heights.length).toBe(4);
+		expect(result.order.length).toBe(4);
+	});
 });

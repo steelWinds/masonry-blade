@@ -1,92 +1,106 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MasonryMatrix Playground</title>
-    <meta
-      name="description"
-      content="MasonryMatrix Playground"
-    />
-    <link rel="preconnect" href="https://picsum.photos" />
-    <link rel="preconnect" href="https://fastly.picsum.photos" crossorigin />
-    <link rel="stylesheet" href="./styles.css" />
-    <script type="module" src="./script.js" defer></script>
-  </head>
-  <body>
-    <header class="toolbar">
-      <div class="toolbar__inner">
-        <div class="toolbar__brand">
-          <span class="toolbar__eyebrow">Playground</span>
-          <h1>MasonryMatrix</h1>
-        </div>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>MasonryMatrix Playground</title>
+		<meta name="description" content="MasonryMatrix Playground" />
+		<link rel="preconnect" href="https://picsum.photos" />
+		<link rel="preconnect" href="https://fastly.picsum.photos" crossorigin />
+		<link rel="stylesheet" href="./styles.css" />
+		<script type="module" src="./script.js" defer></script>
+	</head>
+	<body>
+		<header class="toolbar">
+			<div class="toolbar__inner">
+				<div class="toolbar__brand">
+					<span class="toolbar__eyebrow">Playground</span>
+					<h1>MasonryMatrix</h1>
+				</div>
 
-        <div class="toolbar__controls" aria-label="Управление playground">
-          <label class="field">
-            <span class="field__label">Columns</span>
-            <select id="columnSelect" class="select" aria-label="Количество колонок">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-            </select>
-          </label>
+				<div class="toolbar__controls" aria-label="Управление playground">
+					<label class="field">
+						<span class="field__label">Columns</span>
+						<select
+							id="columnSelect"
+							class="select"
+							aria-label="Количество колонок"
+						>
+							<option value="1">1</option>
+							<option value="2">2</option>
+							<option value="3" selected>3</option>
+							<option value="4">4</option>
+							<option value="5">5</option>
+							<option value="6">6</option>
+						</select>
+					</label>
 
-          <button id="reloadButton" class="button button--primary" type="button">
-            Reload
-          </button>
+					<button
+						id="reloadButton"
+						class="button button--primary"
+						type="button"
+					>
+						Reload
+					</button>
 
-          <button
-            id="responsiveButton"
-            class="button button--ghost"
-            type="button"
-            aria-pressed="false"
-          >
-            Enable Responsive
-          </button>
-        </div>
+					<button
+						id="responsiveButton"
+						class="button button--ghost"
+						type="button"
+						aria-pressed="false"
+					>
+						Enable Responsive
+					</button>
+				</div>
 
-        <aside class="stats" aria-label="Метрики производительности">
-          <div class="stats__item">
-            <span class="stats__label">appendItems()</span>
-            <strong id="appendMetric">—</strong>
-          </div>
-          <div class="stats__item">
-            <span class="stats__label">recreateMatrix()</span>
-            <strong id="recreateMetric">—</strong>
-          </div>
-          <div class="stats__item">
-            <span class="stats__label">items</span>
-            <strong id="itemsMetric">0</strong>
-          </div>
-          <div class="stats__item">
-            <span class="stats__label">active cols</span>
-            <strong id="columnsMetric">3</strong>
-          </div>
-        </aside>
-      </div>
-    </header>
+				<aside class="stats" aria-label="Метрики производительности">
+					<div class="stats__item">
+						<span class="stats__label">appendItems()</span>
+						<strong id="appendMetric">—</strong>
+					</div>
+					<div class="stats__item">
+						<span class="stats__label">recreateMatrix()</span>
+						<strong id="recreateMetric">—</strong>
+					</div>
+					<div class="stats__item">
+						<span class="stats__label">items</span>
+						<strong id="itemsMetric">0</strong>
+					</div>
+					<div class="stats__item">
+						<span class="stats__label">active cols</span>
+						<strong id="columnsMetric">3</strong>
+					</div>
+				</aside>
+			</div>
+		</header>
 
-    <main class="page">
-      <section class="intro card">
-        <p>
-          Picsum API, lazy load, and responsive recreation
+		<main class="page">
+			<section class="intro card">
+				<p>
+					Picsum API, lazy load, and responsive recreation
 
-          <code>recreateMatrix</code>.
-        </p>
-      </section>
+					<code>recreateMatrix</code>.
+				</p>
+			</section>
 
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+			<p id="status" class="status" role="status" aria-live="polite"></p>
 
-      <section id="masonryRoot" class="masonry" aria-live="polite" aria-busy="false"></section>
+			<section
+				id="masonryRoot"
+				class="masonry"
+				aria-live="polite"
+				aria-busy="false"
+			></section>
 
-      <div class="actions">
-        <button id="loadMoreButton" class="button button--primary button--large" type="button">
-          Load more
-        </button>
-      </div>
-    </main>
-  </body>
+			<div class="actions">
+				<button
+					id="loadMoreButton"
+					class="button button--primary button--large"
+					type="button"
+				>
+					Load more
+				</button>
+			</div>
+		</main>
+	</body>
 </html>

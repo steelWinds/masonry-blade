@@ -1,0 +1,73 @@
+name: Deploy playground to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Oxlint
+        run: pnpm lint:fix
+
+      - name: Run Oxfmt
+        run: pnpm fmt:check
+
+      - name: Run Tests
+        run: pnpm test:run
+
+      - name: Run Tests with coverage
+        run: pnpm test:coverage
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Prepare site
+        run: |
+          rm -rf .site
+          mkdir -p .site
+          cp -R playground/. .site/
+          cp -R build .site/build
+          touch .site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

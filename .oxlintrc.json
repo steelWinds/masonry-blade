@@ -8,6 +8,7 @@
 	"plugins": ["eslint"],
 	"rules": {
 		"max-statements": "off",
+		"no-continue": "off",
 		"no-unused-vars": "error",
 		"eqeqeq": ["error", "always", { "null": "ignore" }],
 		"no-magic-numbers": "off",
@@ -30,5 +31,13 @@
 		"es2022": true,
 		"browser": true,
 		"node": true
-	}
+	},
+	"ignorePatterns": [
+		"build/**",
+		"coverage/**",
+		"vendor/**",
+		"test/snapshots/**",
+		"playground/**",
+		"benchmark/**"
+	]
 }

@@ -1,1 +1,1 @@
-export const FAKER_SEED = 2026
+export const FAKER_SEED = 2026;

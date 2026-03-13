@@ -1,6 +1,6 @@
 {
 	"name": "masonry-blade",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"private": false,
 	"description": "Algo-oriented lib for create masonry grid",
 	"keywords": [
@@ -32,10 +32,9 @@
 	"type": "module",
 	"main": "./build/masonry-blade.mjs",
 	"scripts": {
-		"build": "genversion lib/version.js --esm --strict && tsdown --env-file .env.production --minify --log-level error",
-		"build:dev": "genversion lib/version.js --esm --strict && tsdown --env-file .env.development --sourcemap",
-		"build:watch": "genversion lib/version.js --esm --strict && tsdown --env-file .env.development --sourcemap --watch",
-		"benchmark": "cross-env NODE_OPTIONS='--expose-gc --max-old-space-size=8192' tsx --inspect benchmark/bench.ts",
+		"build": "genversion lib/version.js --esm --strict && tsdown --minify --log-level error",
+		"build:watch": "genversion lib/version.js --esm --strict && tsdown --sourcemap --watch",
+		"benchmark": "tsdown --minify --log-level error && cross-env NODE_OPTIONS='--expose-gc --max-old-space-size=8192' tsx benchmark/matrix.benchmark.ts",
 		"test": "vitest",
 		"test:run": "vitest run --testTimeout 0",
 		"test:coverage": "vitest run --coverage",

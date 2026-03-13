@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"target": "ES2022",
 		"module": "nodenext",
-		"types": ["@types/node"],
+		"types": ["@types/node", "tsdown-plugin-worker/types"],
 		"skipLibCheck": true,
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
@@ -29,5 +29,5 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true
 	},
-	"include": ["src", "lib", "bin", "benchmark", "tsdown-env.d.ts"]
+	"include": ["src", "lib", "bin", "benchmark"]
 }

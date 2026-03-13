@@ -8,7 +8,4 @@ export default defineConfig({
 			src: fileURLToPath(new URL('./src', import.meta.url)),
 		},
 	},
-	test: {
-		setupFiles: ['./vitest.setup.ts'],
-	},
 });

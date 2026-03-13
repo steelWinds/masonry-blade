@@ -1,26 +1,22 @@
 import type { MasonryItem, MasonryState } from './types.ts';
 
-export const createMasonryState = (count: number = 1, rootWidth: number): MasonryState => {
-  if (count <= 0) {
-    return {
-      count: 0,
-      width: 0,
-      columns: [],
-      heights: [],
-      order: [],
-    };
-  }
+export const createMasonryState = (
+	rootWidth: number,
+	count: number = 1,
+): MasonryState => {
+	const heights = new Int32Array(count);
+	const order = new Int16Array(count);
+	const columns: MasonryItem[][] = Array.from({ length: count }, () => []);
 
-  const columns: MasonryItem[][] = Array.from({ length: count }, () => []);
-  const heights = Array.from({ length: count }, () => 0);
-  const order = Array.from({ length: count }, (_, index) => index);
-  const width = Math.floor(rootWidth / count);
+	for (let i = 0; i < count; i++) {
+		order[i] = i;
+	}
 
-  return {
-    count,
-    width,
-    columns,
-    heights,
-    order,
-  };
+	return {
+		columns,
+		count,
+		heights,
+		order,
+		width: count === 0 ? 0 : Math.floor(rootWidth / count),
+	};
 };

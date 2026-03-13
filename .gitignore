@@ -29,6 +29,3 @@ coverage
 *.sw?
 result
 results
-
-# Playground
-!playground/build
