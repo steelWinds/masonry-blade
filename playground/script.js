@@ -1,4 +1,4 @@
-import { MasonryMatrix } from './build/masonry-blade.mjs';
+import { MasonryMatrix } from './build/index.js';
 
 const PAGE_SIZE = 18;
 const GAP = 16;

@@ -30,7 +30,8 @@
 		"win32"
 	],
 	"type": "module",
-	"main": "./build/masonry-blade.mjs",
+	"main": "./build/index.js",
+	"types": "./build/index.d.ts",
 	"scripts": {
 		"build": "genversion lib/version.js --esm --strict && tsdown --minify --log-level error",
 		"build:watch": "genversion lib/version.js --esm --strict && tsdown --sourcemap --watch",

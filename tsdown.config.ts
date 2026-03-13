@@ -6,9 +6,10 @@ export default defineConfig({
 		lib: './lib',
 		src: './src',
 	},
-	entry: 'src/app/masonry-blade.ts',
+	dts: true,
+	entry: 'src/app/index.ts',
 	ignoreWatch: ['node_modules', 'build', '__tests__'],
 	outDir: './build',
-	platform: 'node',
+	platform: 'neutral',
 	plugins: [workerPlugins({ format: 'es' })],
 });
