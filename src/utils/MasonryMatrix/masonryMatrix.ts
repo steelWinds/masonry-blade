@@ -11,7 +11,7 @@ import AppendToMatrixWorker from './lib/masonryEngine/appendToMatrix.worker.ts?w
  * Concurrent calls to appendItems/recreateMatrix are not allowed.
  * The caller must serialize access.
  *
- * appendToMatrix mutates the passed state.
+ * appendItems mutates the passed state.
  * Returned columns must be treated as read-only by the caller.
  */
 
