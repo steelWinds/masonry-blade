@@ -5,7 +5,7 @@ import {
 	appendToMatrix,
 	createMasonryState,
 } from './lib/masonryEngine/index.ts';
-import AppendToMatrixWorker from './lib/masonryEngine/appendToMatrix.worker.ts?worker';
+import AppendToMatrixWorker from './lib/masonryEngine/appendToMatrix.worker.ts?worker&inline';
 
 /**
  * Concurrent calls to appendItems/recreateMatrix are not allowed.
