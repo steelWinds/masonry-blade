@@ -397,10 +397,6 @@ For example, do not call `appendItems()` while a previous `recreateMatrix()` cal
 
 ## Development
 
-### Environment variables
-
-See the `docs/` directory for example `.env.*` files. **Environment variable files should be located in the project root directory.**
-
 ### Setup for Development
 
 ```bash
