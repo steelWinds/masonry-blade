@@ -21,14 +21,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
 
-      - name: Setup Node
+      - name: Install Node
         uses: actions/setup-node@v6
         with:
-          node-version: 20
-          cache: npm
+          node-version: 'latest'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
