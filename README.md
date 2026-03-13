@@ -1,6 +1,6 @@
 # masonry-blade
 
-Algo-oriented lib for create masonry grid
+Algo-oriented lib for create masonry grid with ZERO😭😱 dependencies
 
 > Only images are supported for now.
 
