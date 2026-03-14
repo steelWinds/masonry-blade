@@ -18,6 +18,12 @@ Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Wor
 `MasonryMatrix` helps you build and rebuild a masonry layout incrementally.
 It keeps the original input items internally, so you can append new items over time and fully recreate the matrix when the container width or column count changes.
 
+### Install
+
+```ts
+pnpm i masonry-blade
+```
+
 ### Import
 
 ```ts
