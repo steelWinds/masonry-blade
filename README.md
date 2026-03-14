@@ -20,7 +20,7 @@ It keeps the original input items internally, so you can append new items over t
 
 ### Install
 
-```bash
+```shell
 pnpm i masonry-blade
 ```
 
