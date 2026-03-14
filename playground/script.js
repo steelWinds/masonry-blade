@@ -158,22 +158,14 @@ function render(columns) {
 		for (const item of column) {
 			const card = document.createElement('article');
 			card.className = 'masonry__item';
-
-			const image = document.createElement('img');
-			image.className = 'masonry__media';
-			image.src = buildImageSrc(item.id, item.width, item.height);
-			image.alt = `Picsum image ${item.id}`;
-			image.width = item.width;
-			image.height = item.height;
-			image.loading = 'lazy';
-			image.decoding = 'async';
-			image.referrerPolicy = 'no-referrer';
+			card.style.height = `${item.height}px`;
+			card.style.background = `url(${buildImageSrc(item.id, item.width, item.height)}) no-repeat center / cover`;
 
 			const meta = document.createElement('div');
 			meta.className = 'masonry__meta';
 			meta.textContent = item.id;
 
-			card.append(image, meta);
+			card.append(meta);
 			columnNode.append(card);
 		}
 

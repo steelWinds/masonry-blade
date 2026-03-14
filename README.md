@@ -2,29 +2,38 @@
 
 Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Worker-powered😱 calculations, and guaranteed column height differences no greater than 30%.
 
-> Only images are supported for now.
+> Currently, only images are supported. This is essentially an **engine** for constructing _masonry-style_ matrices without any UI manipulation.
+
+> Made with love. ❤️
 
 <div align="center">
-  <img width="300" src="./.github/logo.png" alt="masonry-blad logo">
-  <h3 align="center">masonry-blade</h3>
+  <a href="https://steelwinds.github.io/masonry-blade/" target="_blank">
+    <img width="300" src="./.github/logo.png" alt="masonry-blad logo">
+  </a>
+  <h3 align="center">Click on logo and go to the playground</h3>
 </div>
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 ![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)
+[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
+
+## Playground
+
+> You can see the already built matrix with Picsum API, lazy load, and responsive recreation recreateMatrix on the [Playground](https://steelwinds.github.io/masonry-blade/).
 
 ## Quick start
 
-`MasonryMatrix` helps you build and rebuild a masonry layout incrementally.
-It keeps the original input items internally, so you can append new items over time and fully recreate the matrix when the container width or column count changes.
-
 ### Install
 
-```shell
+```bash
 pnpm i masonry-blade
 ```
 
 ### Import
+
+`MasonryMatrix` helps you build and rebuild a masonry layout incrementally.
+It keeps the original input items internally, so you can append new items over time and fully recreate the matrix when the container width or column count changes.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -308,9 +317,11 @@ const items: ImageItem[] = [
 ];
 
 function getColumnCount(width: number): number {
+	if (width >= 1440) return 5;
 	if (width >= 1024) return 4;
-
-	return 2;
+	if (width >= 768) return 3;
+	if (width >= 480) return 2;
+	return 1;
 }
 
 function render(
