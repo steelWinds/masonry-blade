@@ -65,7 +65,7 @@
 		"vitest": "^4.0.17"
 	},
 	"overrides": {
-		"tsdown": "0.20.3"
+		"tsdown": "0.21.2"
 	},
 	"nano-staged": {
 		"*": "oxfmt --no-error-on-unmatched-pattern",
