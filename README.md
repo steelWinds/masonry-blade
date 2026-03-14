@@ -6,17 +6,17 @@ Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Wor
 
 > Made with love. ❤️
 
+![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
+![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
+![NPM Version](https://img.shields.io/npm/v/masonry-blade)
+[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
+
 <div align="center">
   <a href="https://steelwinds.github.io/masonry-blade/" target="_blank">
     <img width="300" src="./.github/logo.png" alt="masonry-blad logo">
   </a>
   <h3 align="center">Click on logo and go to the playground</h3>
 </div>
-
-![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
-![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
-![NPM Version](https://img.shields.io/npm/v/masonry-blade)
-[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
 
 ## Playground
 
