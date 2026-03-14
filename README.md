@@ -13,7 +13,7 @@ Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Wor
 
 <div align="center">
   <a href="https://steelwinds.github.io/masonry-blade/" target="_blank">
-    <img width="300" src="./.github/logo.png" alt="masonry-blad logo">
+    <img width="300" src="./.github/logo.png" alt="masonry-blade logo">
   </a>
   <h3 align="center">Click on logo and go to the playground</h3>
 </div>
