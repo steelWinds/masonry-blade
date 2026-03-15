@@ -4,7 +4,7 @@ export const createMasonryState = (
 	rootWidth: number,
 	count: number = 1,
 ): MasonryState => {
-	const heights = new Int32Array(count);
+	const heights = new Float64Array(count);
 	const order = new Int16Array(count);
 	const columns: MasonryItem[][] = Array.from({ length: count }, () => []);
 
@@ -17,6 +17,6 @@ export const createMasonryState = (
 		count,
 		heights,
 		order,
-		width: count === 0 ? 0 : Math.floor(rootWidth / count),
+		width: count === 0 ? 0 : rootWidth / count,
 	};
 };

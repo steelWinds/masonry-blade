@@ -80,9 +80,9 @@ const makeState = (
 ): MasonryState => ({
 	columns: columns ?? Array.from({ length: count }, () => [] as MasonryItem[]),
 	count,
-	heights: new Int32Array(count),
+	heights: new Float64Array(count),
 	order: new Int16Array(count),
-	width: Math.floor(rootWidth / count),
+	width: rootWidth / count,
 });
 
 const installWorkerMock = () => {

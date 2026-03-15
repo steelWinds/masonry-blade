@@ -12,7 +12,7 @@ describe('createMasonryState', () => {
 		expect(Array.from(result.heights)).toEqual([0]);
 		expect(Array.from(result.order)).toEqual([0]);
 
-		expect(result.heights).toBeInstanceOf(Int32Array);
+		expect(result.heights).toBeInstanceOf(Float64Array);
 		expect(result.order).toBeInstanceOf(Int16Array);
 	});
 
@@ -27,11 +27,11 @@ describe('createMasonryState', () => {
 		expect(Array.from(result.order)).toEqual([0, 1, 2]);
 	});
 
-	test('uses floor division when rootWidth is not divisible by count', () => {
+	test('dont uses round division when rootWidth is not divisible by count', () => {
 		const result = createMasonryState(1000, 3);
 
-		expect(result.width).toBe(Math.floor(1000 / 3));
-		expect(result.width).toBe(333);
+		expect(result.width).toBe(1000 / 3);
+		expect(result.width).toBe(333.3333333333333);
 	});
 
 	test('returns width = 0 when count is 0', () => {
@@ -95,7 +95,7 @@ describe('createMasonryState', () => {
 	test('creates typed arrays with lengths equal to count', () => {
 		const result = createMasonryState(1400, 4);
 
-		expect(result.heights).toBeInstanceOf(Int32Array);
+		expect(result.heights).toBeInstanceOf(Float64Array);
 		expect(result.order).toBeInstanceOf(Int16Array);
 		expect(result.heights.length).toBe(4);
 		expect(result.order.length).toBe(4);

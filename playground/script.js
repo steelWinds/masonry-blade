@@ -102,10 +102,6 @@ function getMatrixRootWidth(columnCount) {
 	return Math.max(rootWidth - totalGap, columnCount);
 }
 
-function buildImageSrc(id, width, height) {
-	return `https://picsum.photos/id/${id}/${width}/${height}`;
-}
-
 async function fetchBatch(page, limit) {
 	const url = new URL('https://picsum.photos/v2/list');
 	url.searchParams.set('page', String(page));
@@ -137,6 +133,21 @@ function createEmptyState() {
 	return empty;
 }
 
+function softComplementaryHex(id) {
+	let h = ((((Math.sin(id * 9999) * 1e4) % 1) + 1) % 1) * 360 + 180,
+		s = 55,
+		l = 72 / 100,
+		a = (s * Math.min(l, 1 - l)) / 100,
+		f = (n) => {
+			let k = (n + h / 30) % 12,
+				c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+			return Math.round(c * 255)
+				.toString(16)
+				.padStart(2, '0');
+		};
+	return `#${f(0)}${f(8)}${f(4)}`;
+}
+
 function render(columns) {
 	elements.masonryRoot.style.setProperty(
 		'--columns',
@@ -159,7 +170,7 @@ function render(columns) {
 			const card = document.createElement('article');
 			card.className = 'masonry__item';
 			card.style.height = `${item.height}px`;
-			card.style.background = `url(${buildImageSrc(item.id, item.width, item.height)}) no-repeat center / cover`;
+			card.style.backgroundColor = softComplementaryHex(item.id);
 
 			const meta = document.createElement('div');
 			meta.className = 'masonry__meta';

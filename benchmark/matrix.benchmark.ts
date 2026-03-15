@@ -7,7 +7,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 import { faker } from '@faker-js/faker';
 import { FAKER_SEED } from 'lib/constants.ts';
-import { MasonryMatrix } from '../build/index.js';
+import { MasonryMatrix } from '../playground/build/index.js';
 
 type ImageItem = {
 	id: string;

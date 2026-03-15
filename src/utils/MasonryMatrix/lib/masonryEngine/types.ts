@@ -16,6 +16,6 @@ export interface MasonryState {
 	count: number;
 	width: number;
 	columns: readonly MasonryItem[][];
-	heights: Int32Array;
+	heights: Float64Array;
 	order: Int16Array;
 }

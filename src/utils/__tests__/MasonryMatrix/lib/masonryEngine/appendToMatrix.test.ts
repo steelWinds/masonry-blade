@@ -23,9 +23,9 @@ const makeState = (
 		columns:
 			columns ?? Array.from({ length: count }, () => [] as MasonryItem[]),
 		count,
-		heights: new Int32Array(count),
+		heights: new Float64Array(count),
 		order,
-		width: count === 0 ? 0 : Math.floor(rootWidth / count),
+		width: count === 0 ? 0 : rootWidth / count,
 	};
 };
 

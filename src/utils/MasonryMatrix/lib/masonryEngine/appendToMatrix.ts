@@ -19,7 +19,7 @@ export const appendToMatrix = (
 
 		const [shortest] = order;
 
-		const height = Math.floor((item.height * width) / item.width);
+		const height = (item.height * width) / item.width;
 
 		columns[shortest].push({
 			height,
