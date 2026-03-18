@@ -1,9 +1,9 @@
-import type { ImageItem, MasonryState } from './types.ts';
+import type { ImageItem, MatrixItem, MatrixState } from './types.ts';
 
-export const appendToMatrix = (
-	state: MasonryState,
-	items: readonly ImageItem[],
-): MasonryState => {
+export const appendToMatrix = <T = never>(
+	state: MatrixState<T>,
+	items: readonly ImageItem<T>[],
+): MatrixState<T> => {
 	const { count, width, heights, order, columns } = state;
 
 	if (count <= 0 || items.length === 0) {
@@ -21,12 +21,15 @@ export const appendToMatrix = (
 
 		const height = (item.height * width) / item.width;
 
-		columns[shortest].push({
+		const matrixItem = {
 			height,
 			id: item.id,
 			src: item.src,
 			width,
-		});
+			...('meta' in item ? { meta: item.meta } : {}),
+		} as MatrixItem<T>;
+
+		columns[shortest].push(matrixItem);
 
 		const newColumnHeight = heights[shortest] + height;
 

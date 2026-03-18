@@ -18,7 +18,8 @@
 		"noEmit": true,
 		"paths": {
 			"src/*": ["./src/*"],
-			"lib/*": ["./lib/*"]
+			"lib/*": ["./lib/*"],
+			"tests/*": ["./tests/*"]
 		},
 
 		/* Linting */
@@ -29,5 +30,5 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true
 	},
-	"include": ["src", "lib", "bin", "benchmark"]
+	"include": ["src", "lib", "tests", "benchmark"]
 }

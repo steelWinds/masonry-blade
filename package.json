@@ -1,6 +1,6 @@
 {
 	"name": "masonry-blade",
-	"version": "0.1.4",
+	"version": "1.0.0",
 	"private": false,
 	"description": "Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Worker-powered😱 calculations, and guaranteed column height differences no greater than 30%.",
 	"keywords": [
@@ -40,29 +40,29 @@
 		"test:run": "vitest run --testTimeout 0",
 		"test:coverage": "vitest run --coverage",
 		"lint": "oxlint --type-aware",
-		"lint:fix": "oxlint --fix",
+		"lint:fix": "oxlint --fix --type-aware",
 		"nano-staged": "nano-staged",
 		"fmt": "oxfmt",
 		"fmt:check": "oxfmt --check",
 		"prepare": "husky"
 	},
 	"devDependencies": {
-		"@faker-js/faker": "^10.2.0",
-		"@types/node": "^25.3.5",
-		"@vitest/coverage-v8": "^4.0.17",
+		"@faker-js/faker": "^10.3.0",
+		"@types/node": "^25.5.0",
+		"@vitest/coverage-v8": "^4.1.0",
 		"cross-env": "^10.1.0",
 		"genversion": "^3.2.0",
 		"husky": "^9.1.7",
 		"nano-staged": "^0.9.0",
 		"oxfmt": "^0.35.0",
-		"oxlint": "^1.42.0",
+		"oxlint": "^1.56.0",
 		"oxlint-tsgolint": "^0.16.0",
 		"tinybench": "^6.0.0",
 		"tsdown": "0.20.3",
 		"tsdown-plugin-worker": "^0.1.9",
 		"tsx": "^4.21.0",
 		"typescript": "~5.9.3",
-		"vitest": "^4.0.17"
+		"vitest": "^4.1.0"
 	},
 	"overrides": {
 		"tsdown": "0.20.3"

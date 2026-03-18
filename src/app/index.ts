@@ -1,5 +1,7 @@
-export type {
-	ImageItem,
-	MasonryItem,
-} from 'src/utils/MasonryMatrix/lib/masonryEngine/index.ts';
-export { MasonryMatrix } from 'src/utils/MasonryMatrix/index.ts';
+export {
+	type ImageItem,
+	type MatrixItem,
+	MatrixError,
+	MATRIX_ERROR_MESSAGES,
+	MasonryMatrix,
+} from 'src/core/MasonryMatrix/index.ts';

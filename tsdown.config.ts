@@ -5,6 +5,7 @@ export default defineConfig({
 	alias: {
 		lib: './lib',
 		src: './src',
+		tests: './tests',
 	},
 	dts: true,
 	entry: 'src/app/index.ts',

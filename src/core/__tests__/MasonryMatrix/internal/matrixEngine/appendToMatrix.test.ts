@@ -1,18 +1,22 @@
 import type {
 	ImageItem,
-	MasonryItem,
-	MasonryState,
-} from 'src/utils/MasonryMatrix/lib/masonryEngine/types.ts';
+	MatrixItem,
+	MatrixState,
+} from 'src/core/MasonryMatrix/internal/matrixEngine/types.ts';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { FAKER_SEED } from 'lib/constants.ts';
-import { appendToMatrix } from 'src/utils/MasonryMatrix/lib/masonryEngine/appendToMatrix.ts';
+import { FAKER_SEED } from 'tests/constants.ts';
+import { appendToMatrix } from 'src/core/MasonryMatrix/internal/matrixEngine/appendToMatrix.ts';
 import { faker } from '@faker-js/faker';
 
-const makeState = (
+interface Meta {
+	name: string;
+}
+
+const makeState = <T = never>(
 	count: number,
 	rootWidth: number,
-	columns?: MasonryItem[][],
-): MasonryState => {
+	columns?: MatrixItem<T>[][],
+): MatrixState<T> => {
 	const order = new Int16Array(count);
 
 	for (let i = 0; i < count; i++) {
@@ -21,7 +25,7 @@ const makeState = (
 
 	return {
 		columns:
-			columns ?? Array.from({ length: count }, () => [] as MasonryItem[]),
+			columns ?? Array.from({ length: count }, () => [] as MatrixItem<T>[]),
 		count,
 		heights: new Float64Array(count),
 		order,
@@ -37,7 +41,7 @@ const makeImageItems = (
 		minHeight?: number;
 		maxHeight?: number;
 	},
-): ImageItem[] => {
+): ImageItem<Meta>[] => {
 	const {
 		minWidth = 120,
 		maxWidth = 1600,
@@ -48,6 +52,9 @@ const makeImageItems = (
 	return Array.from({ length: count }, () => ({
 		height: faker.number.int({ max: maxHeight, min: minHeight }),
 		id: faker.string.uuid(),
+		meta: {
+			name: faker.person.fullName(),
+		},
 		src: faker.internet.url(),
 		width: faker.number.int({ max: maxWidth, min: minWidth }),
 	}));
@@ -66,8 +73,8 @@ describe('appendToMatrix', () => {
 
 		expect(result).toBe(state);
 		expect(result.columns).toHaveLength(0);
-		expect(Array.from(result.heights)).toEqual([]);
-		expect(Array.from(result.order)).toEqual([]);
+		expect(Array.from(result.heights)).toStrictEqual([]);
+		expect(Array.from(result.order)).toStrictEqual([]);
 	});
 
 	test('returns the same state unchanged when items are empty', () => {
@@ -82,22 +89,65 @@ describe('appendToMatrix', () => {
 		expect(result.columns).toBe(originalColumns);
 		expect(result.heights).toBe(originalHeights);
 		expect(result.order).toBe(originalOrder);
-		expect(result.columns).toEqual([[], [], []]);
-		expect(Array.from(result.heights)).toEqual([0, 0, 0]);
-		expect(Array.from(result.order)).toEqual([0, 1, 2]);
+		expect(result.columns).toStrictEqual([[], [], []]);
+		expect(Array.from(result.heights)).toStrictEqual([0, 0, 0]);
+		expect(Array.from(result.order)).toStrictEqual([0, 1, 2]);
+	});
+
+	test('create meta property if source items does contain it', () => {
+		let state;
+		let result;
+
+		const item = {
+			height: 200,
+			id: faker.string.uuid(),
+			src: faker.image.url(),
+			width: 400,
+		};
+
+		const itemsWithMeta: ImageItem<Meta>[] = [
+			{
+				...item,
+				meta: {
+					name: faker.person.fullName(),
+				},
+			},
+		];
+
+		const itemsWithoutMeta: ImageItem[] = [item];
+
+		state = makeState(2, 400);
+
+		result = appendToMatrix(state, itemsWithMeta);
+
+		expect(result.columns[0][0]).toHaveProperty('meta');
+
+		state = makeState(2, 400);
+
+		result = appendToMatrix(state, itemsWithoutMeta);
+
+		expect(result.columns[0][0]).not.toHaveProperty('meta');
 	});
 
 	test('mutates the original state in place and returns the same reference', () => {
+		const url = faker.image.url();
+		const uuid = faker.string.uuid();
+
 		const state = makeState(2, 400);
+
 		const originalColumns = state.columns;
 		const originalHeights = state.heights;
 		const originalOrder = state.order;
+		const originalMeta = {
+			name: faker.person.fullName(),
+		};
 
-		const items: ImageItem[] = [
+		const items: ImageItem<Meta>[] = [
 			{
 				height: 200,
-				id: 'img-1',
-				src: 'https://example.com/1.jpg',
+				id: uuid,
+				meta: originalMeta,
+				src: url,
 				width: 400,
 			},
 		];
@@ -109,137 +159,192 @@ describe('appendToMatrix', () => {
 		expect(result.heights).toBe(originalHeights);
 		expect(result.order).toBe(originalOrder);
 
-		expect(result.columns[0]).toEqual([
+		// For meta object does not create copy
+		expect(result.columns[0][0].meta).toBe(originalMeta);
+
+		expect(result.columns[0]).toStrictEqual([
 			{
 				height: 100,
-				id: 'img-1',
-				src: 'https://example.com/1.jpg',
+				id: uuid,
+				meta: originalMeta,
+				src: url,
 				width: 200,
 			},
 		]);
-		expect(Array.from(result.heights)).toEqual([100, 0]);
-		expect(Array.from(result.order)).toEqual([1, 0]);
+		expect(Array.from(result.heights)).toStrictEqual([100, 0]);
+		expect(Array.from(result.order)).toStrictEqual([1, 0]);
 	});
 
 	test('skips items with non-positive width or height', () => {
+		const names = faker.helpers.uniqueArray(faker.person.firstName, 3);
+		const urls = faker.helpers.uniqueArray(faker.image.url, 3);
+		const uuids = faker.helpers.uniqueArray(faker.string.uuid, 3);
+
 		const state = makeState(2, 400);
 
-		const items: ImageItem[] = [
+		const items: ImageItem<Meta>[] = [
 			{
 				height: 200,
-				id: 'invalid-width',
-				src: 'https://example.com/invalid-width.jpg',
+				id: uuids[0],
+				meta: {
+					name: names[0],
+				},
+				src: urls[0],
 				width: 0,
 			},
 			{
 				height: -10,
-				id: 'invalid-height',
-				src: 'https://example.com/invalid-height.jpg',
+				id: uuids[1],
+				meta: {
+					name: names[1],
+				},
+				src: urls[1],
 				width: 200,
 			},
 			{
 				height: 200,
-				id: 'valid',
-				src: 'https://example.com/valid.jpg',
+				id: uuids[2],
+				meta: {
+					name: names[2],
+				},
+				src: urls[2],
 				width: 400,
 			},
 		];
 
 		const result = appendToMatrix(state, items);
 
-		expect(result.columns).toEqual([
+		expect(result.columns).toStrictEqual([
 			[
 				{
 					height: 100,
-					id: 'valid',
-					src: 'https://example.com/valid.jpg',
+					id: uuids[2],
+					meta: {
+						name: names[2],
+					},
+					src: urls[2],
 					width: 200,
 				},
 			],
 			[],
 		]);
-		expect(Array.from(result.heights)).toEqual([100, 0]);
-		expect(Array.from(result.order)).toEqual([1, 0]);
+		expect(Array.from(result.heights)).toStrictEqual([100, 0]);
+		expect(Array.from(result.order)).toStrictEqual([1, 0]);
 	});
 
 	test('places each item into the current shortest column and updates order', () => {
+		const names = faker.helpers.uniqueArray(faker.person.firstName, 3);
+		const urls = faker.helpers.uniqueArray(faker.image.url, 3);
+		const uuids = faker.helpers.uniqueArray(faker.string.uuid, 3);
+
 		const state = makeState(2, 400);
 
-		const items: ImageItem[] = [
+		const items: ImageItem<Meta>[] = [
 			{
 				height: 200,
-				id: 'a',
-				src: 'https://example.com/a.jpg',
+				id: uuids[0],
+				meta: {
+					name: names[0],
+				},
+				src: urls[0],
 				width: 400,
 			},
 			{
 				height: 200,
-				id: 'b',
-				src: 'https://example.com/b.jpg',
+				id: uuids[1],
+				meta: {
+					name: names[1],
+				},
+				src: urls[1],
 				width: 200,
 			},
 			{
 				height: 300,
-				id: 'c',
-				src: 'https://example.com/c.jpg',
+				id: uuids[2],
+				meta: {
+					name: names[2],
+				},
+				src: urls[2],
 				width: 400,
 			},
 		];
 
 		const result = appendToMatrix(state, items);
 
-		expect(result.columns).toEqual([
+		expect(result.columns).toStrictEqual([
 			[
 				{
 					height: 100,
-					id: 'a',
-					src: 'https://example.com/a.jpg',
+					id: uuids[0],
+					meta: {
+						name: names[0],
+					},
+					src: urls[0],
 					width: 200,
 				},
 				{
 					height: 150,
-					id: 'c',
-					src: 'https://example.com/c.jpg',
+					id: uuids[2],
+					meta: {
+						name: names[2],
+					},
+					src: urls[2],
 					width: 200,
 				},
 			],
 			[
 				{
 					height: 200,
-					id: 'b',
-					src: 'https://example.com/b.jpg',
+					id: uuids[1],
+					meta: {
+						name: names[1],
+					},
+					src: urls[1],
 					width: 200,
 				},
 			],
 		]);
 
-		expect(Array.from(result.heights)).toEqual([250, 200]);
-		expect(Array.from(result.order)).toEqual([1, 0]);
+		expect(Array.from(result.heights)).toStrictEqual([250, 200]);
+		expect(Array.from(result.order)).toStrictEqual([1, 0]);
 	});
 
 	test('continues appending correctly for a pre-populated state', () => {
+		const names = faker.helpers.uniqueArray(faker.person.firstName, 4);
+		const urls = faker.helpers.uniqueArray(faker.image.url, 4);
+		const uuids = faker.helpers.uniqueArray(faker.string.uuid, 4);
+
 		const state = makeState(3, 900, [
 			[
 				{
 					height: 300,
-					id: 'existing-0',
-					src: 'https://example.com/existing-0.jpg',
+					id: uuids[0],
+					meta: {
+						name: names[0],
+					},
+					src: urls[0],
 					width: 300,
 				},
 			],
 			[
 				{
 					height: 100,
-					id: 'existing-1',
-					src: 'https://example.com/existing-1.jpg',
+					id: uuids[1],
+					meta: {
+						name: names[1],
+					},
+					src: urls[1],
 					width: 300,
 				},
 			],
 			[
 				{
 					height: 200,
-					id: 'existing-2',
-					src: 'https://example.com/existing-2.jpg',
+					id: uuids[2],
+					meta: {
+						name: names[2],
+					},
+					src: urls[2],
 					width: 300,
 				},
 			],
@@ -248,38 +353,48 @@ describe('appendToMatrix', () => {
 		state.heights[0] = 300;
 		state.heights[1] = 100;
 		state.heights[2] = 200;
+
 		state.order[0] = 1;
 		state.order[1] = 2;
 		state.order[2] = 0;
 
-		const items: ImageItem[] = [
+		const items: ImageItem<Meta>[] = [
 			{
 				height: 300,
-				id: 'next',
-				src: 'https://example.com/next.jpg',
+				id: uuids[3],
+				meta: {
+					name: names[3],
+				},
+				src: urls[3],
 				width: 600,
 			},
 		];
 
 		const result = appendToMatrix(state, items);
 
-		expect(result.columns[1]).toEqual([
+		expect(result.columns[1]).toStrictEqual([
 			{
 				height: 100,
-				id: 'existing-1',
-				src: 'https://example.com/existing-1.jpg',
+				id: uuids[1],
+				meta: {
+					name: names[1],
+				},
+				src: urls[1],
 				width: 300,
 			},
 			{
 				height: 150,
-				id: 'next',
-				src: 'https://example.com/next.jpg',
+				id: uuids[3],
+				meta: {
+					name: names[3],
+				},
+				src: urls[3],
 				width: 300,
 			},
 		]);
 
-		expect(Array.from(result.heights)).toEqual([300, 250, 200]);
-		expect(Array.from(result.order)).toEqual([2, 1, 0]);
+		expect(Array.from(result.heights)).toStrictEqual([300, 250, 200]);
+		expect(Array.from(result.order)).toStrictEqual([2, 1, 0]);
 	});
 
 	test('does not create duplicate placements for unique valid items', () => {
@@ -298,7 +413,7 @@ describe('appendToMatrix', () => {
 
 		expect(placedIds).toHaveLength(validIds.length);
 		expect(new Set(placedIds).size).toBe(validIds.length);
-		expect(new Set(placedIds)).toEqual(new Set(validIds));
+		expect(new Set(placedIds)).toStrictEqual(new Set(validIds));
 	});
 
 	test('keeps internal heights consistent with the actual column contents', () => {
@@ -316,7 +431,7 @@ describe('appendToMatrix', () => {
 			column.reduce((sum, item) => sum + item.height, 0),
 		);
 
-		expect(Array.from(result.heights)).toEqual(calculatedHeights);
+		expect(Array.from(result.heights)).toStrictEqual(calculatedHeights);
 	});
 
 	test('keeps the column height gap below 30% for a large batch of items', () => {

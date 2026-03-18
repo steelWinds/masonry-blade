@@ -40,9 +40,6 @@ jobs:
       - name: Run Tests
         run: pnpm test:run
 
-      - name: Run Tests with coverage
-        run: pnpm test:coverage
-
       - name: Build project
         run: pnpm build
 

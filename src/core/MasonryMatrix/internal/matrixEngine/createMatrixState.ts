@@ -1,12 +1,12 @@
-import type { MasonryItem, MasonryState } from './types.ts';
+import type { MatrixItem, MatrixState } from './types.ts';
 
-export const createMasonryState = (
+export const createMatrixState = <T = never>(
 	rootWidth: number,
 	count: number = 1,
-): MasonryState => {
+): MatrixState<T> => {
 	const heights = new Float64Array(count);
 	const order = new Int16Array(count);
-	const columns: MasonryItem[][] = Array.from({ length: count }, () => []);
+	const columns: MatrixItem<T>[][] = Array.from({ length: count }, () => []);
 
 	for (let i = 0; i < count; i++) {
 		order[i] = i;

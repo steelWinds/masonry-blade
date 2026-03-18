@@ -1,11 +1,12 @@
 import {
 	type ImageItem,
-	type MasonryItem,
-	type MasonryState,
+	type MatrixItem,
+	type MatrixState,
 	appendToMatrix,
-	createMasonryState,
-} from './lib/masonryEngine/index.ts';
-import AppendToMatrixWorker from './lib/masonryEngine/appendToMatrix.worker.ts?worker&inline';
+	createMatrixState,
+} from './internal/matrixEngine/index.ts';
+import { MATRIX_ERROR_MESSAGES, MatrixError } from './errors/index.ts';
+import AppendToMatrixWorker from './internal/matrixEngine/appendToMatrix.worker.ts?worker&inline';
 
 /**
  * Concurrent calls to appendItems/recreateMatrix are not allowed.
@@ -15,21 +16,21 @@ import AppendToMatrixWorker from './lib/masonryEngine/appendToMatrix.worker.ts?w
  * Returned columns must be treated as read-only by the caller.
  */
 
-export class MasonryMatrix {
+export class MasonryMatrix<T = never> {
 	private _worker?: Worker;
 	private _workerTerminatedSignal?: (reason?: unknown) => void;
-	private _state: MasonryState;
-	private _rawItems: ImageItem[];
+	private _state: MatrixState<T>;
+	private _rawItems: ImageItem<T>[];
 
 	constructor(rootWidth: number, count?: number) {
-		this._state = createMasonryState(rootWidth, count);
+		this._state = createMatrixState<T>(rootWidth, count);
 		this._rawItems = [];
 	}
 
 	private async _updateState(
-		state: MasonryState,
-		batchItems: readonly ImageItem[],
-	): Promise<MasonryState> {
+		state: MatrixState<T>,
+		batchItems: readonly ImageItem<T>[],
+	): Promise<MatrixState<T>> {
 		try {
 			if (this._worker == null) {
 				this._createWorker();
@@ -39,10 +40,10 @@ export class MasonryMatrix {
 				return appendToMatrix(state, batchItems);
 			}
 
-			return await new Promise<MasonryState>((resolve, reject) => {
+			return await new Promise<MatrixState<T>>((resolve, reject) => {
 				this._workerTerminatedSignal = reject;
 
-				this._worker!.onmessage = (e: MessageEvent<MasonryState>) => {
+				this._worker!.onmessage = (e: MessageEvent<MatrixState<T>>) => {
 					this._workerTerminatedSignal = undefined;
 
 					resolve(e.data);
@@ -51,27 +52,27 @@ export class MasonryMatrix {
 				this._worker!.onmessageerror = () => {
 					this._workerTerminatedSignal = undefined;
 
-					reject(
-						new Error(`[MasonryMatrix] Error receiving message from worker`),
-					);
+					reject(new MatrixError(MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER));
 				};
 
 				this._worker!.onerror = (e: ErrorEvent) => {
 					this._workerTerminatedSignal = undefined;
 
-					reject(new Error(`[MasonryMatrix] Error while worker: ${e.message}`));
+					reject(
+						new MatrixError(MATRIX_ERROR_MESSAGES.WORKER_ERROR, { cause: e }),
+					);
 				};
 
 				this._worker!.postMessage({ batchItems, state });
 			});
 		} catch (e: unknown) {
-			console.error(`[MasonryMatrix] Error while update internal state: ${e}`);
-
-			throw e;
+			throw new MatrixError(MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE, {
+				cause: e,
+			});
 		}
 	}
 
-	private _appendToRawItems(batchItems: readonly ImageItem[]): void {
+	private _appendToRawItems(batchItems: readonly ImageItem<T>[]): void {
 		const start = this._rawItems.length;
 		const len = batchItems.length;
 
@@ -90,7 +91,7 @@ export class MasonryMatrix {
 
 	terminateWorker(): void {
 		this._workerTerminatedSignal?.(
-			new Error('[MasonryMatrix] Worker terminated'),
+			new MatrixError(MATRIX_ERROR_MESSAGES.WORKER_TERMINATED),
 		);
 		this._worker?.terminate();
 
@@ -99,8 +100,8 @@ export class MasonryMatrix {
 	}
 
 	async appendItems(
-		items: readonly ImageItem[],
-	): Promise<readonly MasonryItem[][]> {
+		items: readonly ImageItem<T>[],
+	): Promise<readonly MatrixItem<T>[][]> {
 		try {
 			this._state = await this._updateState(this._state, items);
 
@@ -108,26 +109,24 @@ export class MasonryMatrix {
 
 			return this._state.columns;
 		} catch (e: unknown) {
-			console.error(`[MasonryMatrix] Error while append items to matrix: ${e}`);
-
-			throw e;
+			throw new MatrixError(MATRIX_ERROR_MESSAGES.APPEND_ITEMS, { cause: e });
 		}
 	}
 
 	async recreateMatrix(
 		rootWidth: number,
 		count?: number,
-	): Promise<readonly MasonryItem[][]> {
+	): Promise<readonly MatrixItem<T>[][]> {
 		try {
-			this._state = createMasonryState(rootWidth, count);
+			this._state = createMatrixState<T>(rootWidth, count);
 
 			this._state = await this._updateState(this._state, this._rawItems);
 
-			return this._state.columns;
+			return this._state.columns as readonly MatrixItem<T>[][];
 		} catch (e: unknown) {
-			console.error(`[MasonryMatrix] Error while recreate matrix: ${e}`);
-
-			throw e;
+			throw new MatrixError(MATRIX_ERROR_MESSAGES.RECREATE_MATRIX, {
+				cause: e,
+			});
 		}
 	}
 }
