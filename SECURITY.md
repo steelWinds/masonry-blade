@@ -16,7 +16,7 @@ Please **do not** report security issues through public GitHub issues.
 Use one of the following private channels instead:
 
 - **GitHub Private Vulnerability Reporting** (preferred)
-- Email: **TODO: kirillsurov0@gmail.com**
+- Email: **kirillsurov0@gmail.com**
 
 Reports may be submitted in **English or Russian**.
 

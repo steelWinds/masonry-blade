@@ -1,18 +1,18 @@
 # masonry-blade
 
+## [Русская версия](./README.ru.md)
+
 <p>
   <img align="right" width="30%" src="./.github/logo.png" alt="masonry-blade logo">
 </p>
 
-Algo-oriented library for calculating masonry grids with zero dependencies 🧱 It uses Web Worker-based computation when a worker is available.
+Algorithm-oriented library for calculating a masonry grid with zero dependencies 🧱 If a Web Worker is available in the current environment, computations are offloaded to it.
 
-> Internally, the matrix is balanced with a greedy strategy: each next item is placed into the current shortest column. This is not a formal guarantee of a fixed height gap, but in practice it gives an almost ideal quality/speed trade-off for this kind of engine.
+> Internally, the matrix is balanced with a greedy strategy: each next item is placed into the current shortest column. This is not a formal guarantee of a fixed height gap, but in practice it delivers an almost ideal compromise between quality and speed for an engine of this type.
 
-> At the moment, only images are supported. This is an **engine** for building a _masonry-style_ matrix without touching the UI layer.
+> This is an **engine** for building a _masonry-style_ matrix without touching the UI layer.
 
 > Made with love. ❤️
-
-[Русская версия](./README.ru.md)
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 
@@ -29,7 +29,7 @@ Algo-oriented library for calculating masonry grids with zero dependencies 🧱 
 
 `masonry-blade` is an engine for calculating a masonry matrix.
 
-It does **not render UI**. It only distributes images across columns and returns a data structure that you can render in your own interface.
+The library **does not render UI**. It only distributes images across columns and returns a data structure that you can render in your own interface.
 
 ### Installation
 
@@ -61,20 +61,20 @@ Public exports:
 
 - `MasonryMatrix` — the main class for building the matrix.
 - `MatrixError` — the library's custom error.
-- `MATRIX_ERROR_MESSAGES` — exported error message constants.
+- `MATRIX_ERROR_MESSAGES` — exported constants with error message strings.
 - `ImageItem<T>` — the input item type.
-- `MatrixItem<T>` — the placed item type returned by the matrix.
+- `MatrixItem<T>` — the item type after placement in the matrix.
 
 ### How it works
 
-1. Create a `MasonryMatrix` instance with a container width and column count.
+1. Create a `MasonryMatrix` instance by passing the container width and the number of columns.
 2. Pass images through `appendItems(...)`.
-3. Get an array of columns.
+3. Get the array of columns.
 4. When the container width changes, call `recreateMatrix(...)` to rebuild the layout from already appended items.
 
-> `recreateMatrix(...)` does not require you to pass items again. The library rebuilds the matrix from the internal list of already appended source items.
+> `recreateMatrix(...)` does not require you to pass the items again. The library rebuilds the matrix from its internal list of previously appended raw items.
 
-> Each resulting item always gets the column width, and its height is recalculated proportionally from the original aspect ratio.
+> Each resulting item always gets the column width, and its height is recalculated proportionally based on the original aspect ratio.
 
 ### Input and output types
 
@@ -96,9 +96,9 @@ type MatrixItem<T = never> = {
 } & (T extends never ? {} : { meta: T });
 ```
 
-> `meta` is convenient for any related data: `alt`, `title`, `author`, `href`, internal ids, flags, and so on.
+> `meta` is convenient for any related data: `alt`, `title`, `author`, `href`, internal IDs, flags, and so on.
 
-> Internally the library has a `Meta<T>` concept meaning “item + user-defined data”. It is not exported as a separate public type, but this is how the public API behaves: once you provide a generic `T`, both `ImageItem<T>` and `MatrixItem<T>` include `meta: T`.
+> Internally, the library relies on the `Meta<T>` concept, meaning “item + user data”. It is not exported as a separate public type, but from the public API perspective the behavior is straightforward: as soon as you provide a generic `T`, both `ImageItem<T>` and `MatrixItem<T>` include `meta: T`.
 
 ### Example: minimal usage
 
@@ -184,7 +184,7 @@ console.log(firstItem.meta.author);
 // Kate
 ```
 
-### Example: rebuild on resize
+### Example: rebuilding on resize
 
 ```ts
 import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
@@ -216,14 +216,14 @@ console.log(mobileColumns.length);
 
 Creates a new matrix instance.
 
-| Param       | Type     | Required | Description                  |
-| ----------- | -------- | -------- | ---------------------------- |
-| `rootWidth` | `number` | yes      | Container width              |
-| `count`     | `number` | no       | Column count, default is `1` |
+| Parameter   | Type     | Required | Description                    |
+| ----------- | -------- | -------- | ------------------------------ |
+| `rootWidth` | `number` | yes      | Container width                |
+| `count`     | `number` | no       | Number of columns, default `1` |
 
 ### `await appendItems(items)`
 
-Appends a new batch of items to the current matrix and returns the columns.
+Adds a new batch of items to the current matrix and returns the columns.
 
 ```ts
 appendItems(items: readonly ImageItem<T>[]): Promise<readonly MatrixItem<T>[][]>
@@ -233,7 +233,7 @@ appendItems(items: readonly ImageItem<T>[]): Promise<readonly MatrixItem<T>[][]>
 
 ### `await recreateMatrix(rootWidth, count?)`
 
-Fully recreates the matrix with a new container width and/or a new column count using **all previously appended** items.
+Completely rebuilds the matrix with a new container width and/or a new column count, using **all previously appended** items.
 
 ```ts
 recreateMatrix(rootWidth: number, count?: number): Promise<readonly MatrixItem<T>[][]>
@@ -243,7 +243,7 @@ recreateMatrix(rootWidth: number, count?: number): Promise<readonly MatrixItem<T
 
 ### `terminateWorker()`
 
-Forcefully terminates the internal worker if one was created. The next call to `appendItems(...)` or `recreateMatrix(...)` will create a new worker automatically.
+Forcefully terminates the internal worker if it has been created. The next call to `appendItems(...)` or `recreateMatrix(...)` automatically creates a new worker.
 
 ## Errors
 
@@ -278,29 +278,80 @@ try {
 Available error messages:
 
 - `MATRIX_ERROR_MESSAGES.APPEND_ITEMS`
+- `MATRIX_ERROR_MESSAGES.CONCURRENT_CALL`
 - `MATRIX_ERROR_MESSAGES.RECREATE_MATRIX`
 - `MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE`
 - `MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER`
 - `MATRIX_ERROR_MESSAGES.WORKER_ERROR`
 - `MATRIX_ERROR_MESSAGES.WORKER_TERMINATED`
 
+## Concurrent calls and structured clone
+
+`MasonryMatrix` does not support concurrent calls on the same instance.
+
+Do not call `appendItems(...)` and/or `recreateMatrix(...)` in parallel on the same `MasonryMatrix`. These operations must be serialized by the caller.
+
+If a concurrent call happens while a previous matrix update is still in flight, the library throws a `MatrixError`.
+
+In practice, this means:
+
+- do not start a second `appendItems(...)` before the previous one has finished;
+- do not call `recreateMatrix(...)` while `appendItems(...)` is still running;
+- do not call `appendItems(...)` while `recreateMatrix(...)` is still running.
+
+### Structured clone requirement for Worker mode
+
+If `Worker` is available in the current environment, the library sends matrix data to the worker via `postMessage(...)`.
+
+Because of that, all transferred data must be compatible with the browser's **structured clone algorithm**.
+
+This is especially important for `meta` when you use `ImageItem<T>` / `MatrixItem<T>` with a generic type.
+
+Do not put non-cloneable values into `meta`, for example:
+
+- functions;
+- DOM nodes;
+- class instances with non-serializable internal state;
+- unsupported custom objects for your target runtime.
+
+If the payload for the worker cannot be cloned, the library throws a `MatrixError`.
+
+Typical examples:
+
+- `appendItems(...)` throws if the provided batch cannot be cloned for worker transfer;
+- `recreateMatrix(...)` throws if previously accumulated raw items cannot be cloned for worker transfer.
+
+### Practical recommendation
+
+Keep `meta` as simple structured data:
+
+- strings;
+- numbers;
+- booleans;
+- `null`;
+- arrays;
+- plain objects;
+- other values that are safely supported by structured clone in your target runtime.
+
+A good rule of thumb is: if your `meta` looks like JSON-like application data, it is usually a good fit for Worker mode.
+
 ## Important notes
 
 - Items with `width <= 0` or `height <= 0` are silently skipped.
 - `count = 0` is allowed, but it means an empty matrix mode: column width becomes `0`, and `appendItems(...)` places nothing.
 - The library supports images only: `width` and `height` must be known in advance.
-- If `Worker` is unavailable in the current environment, the library still works — computation simply falls back to the main thread.
-- Returned columns should be treated as read-only even though they are regular arrays at runtime.
-- `meta` is passed by reference when it is an object.
-- Calls to `appendItems(...)` and `recreateMatrix(...)` must be serialized for a single `MasonryMatrix` instance: do not run them in parallel.
+- If `Worker` is not available in the current environment, the library still works — computations are simply performed on the main thread.
+- Returned columns should be treated as read-only, even though they are regular arrays at runtime.
+- Do not rely on referential identity for `meta` when using Worker mode: data is transferred via structured clone.
+- See the `Concurrent calls and structured clone` section above for important runtime constraints.
 
-> `masonry-blade` knows nothing about the DOM, React, Vue, card rendering, lazy loading, or styling. It only returns layout data that can be rendered in any UI layer.
+> `masonry-blade` knows nothing about the DOM, React, Vue, card rendering, lazy loading, or styling. The library only returns layout data that can be rendered in any UI layer.
 
-> The matrix state is mutable internally, and returned columns are references to that state. Do not mutate them manually with `push`, `splice`, direct assignment, and so on.
+> The matrix state is mutable internally, and the returned columns are references to that state. Do not mutate them manually with `push`, `splice`, direct assignment, and so on.
 
-## Сontributing
+## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) file
+See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Benchmark
 
@@ -312,11 +363,11 @@ Latest benchmark results: [benchmark/benchmark-results.md](benchmark/benchmark-r
 
 ## License
 
-This project is licensed under the MPL 2.0 License.
+This project is licensed under MPL 2.0.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) file
+See [SECURITY.md](SECURITY.md)
 
 ## Links
 

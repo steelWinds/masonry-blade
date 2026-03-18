@@ -85,7 +85,7 @@ For behavior changes, please add or update tests.
 Especially useful are tests for:
 
 - invalid input handling
-- mutation matrix state
+- matrix state mutations
 - resize / matrix recreation behavior
 - item ordering guarantees
 - concurrency / serialization expectations
