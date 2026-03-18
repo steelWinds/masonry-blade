@@ -5,14 +5,13 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
 
-permissions:
-  actions: read
-  contents: read
-
 jobs:
   build-validate:
     name: build-validate
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
 
     steps:
       - name: Checkout
@@ -21,12 +20,12 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: latest
+          version: 10
 
       - name: Install Node
         uses: actions/setup-node@v6
         with:
-          node-version: 'latest'
+          node-version: '>=20.19.0'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -37,6 +36,9 @@ jobs:
 
       - name: Run Oxfmt
         run: pnpm fmt:check
+
+      - name: Run Tests
+        run: pnpm test:run
 
       - name: Build project
         run: pnpm build
