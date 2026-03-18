@@ -2,9 +2,11 @@ name: build-validate
 
 on:
   pull_request:
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
+  actions: read
   contents: read
 
 jobs:

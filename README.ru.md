@@ -1,5 +1,9 @@
 # masonry-blade
 
+<p>
+  <img align="right" width="30%" src="./.github/logo.png" alt="masonry-blade logo">
+</p>
+
 Библиотека для расчёта masonry-сеток без зависимостей 🧱 Если в окружении доступен Web Worker, вычисления будут выполняться через него.
 
 > Внутри используется жадная балансировка: каждый следующий элемент ставится в самую низкую колонку. Это не формальная гарантия фиксированного разрыва по высоте, но на практике даёт почти идеальный баланс по соотношению качество/скорость для такого типа движка.
@@ -12,16 +16,14 @@
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 
+[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
+[![CodeQL](https://github.com/steelWinds/masonry-blade/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/codeql.yml)
+
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)
 ![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/masonry-blade)
 
-[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
 [![codecov](https://codecov.io/gh/steelWinds/masonry-blade/graph/badge.svg?token=48NKR93X2A)](https://codecov.io/gh/steelWinds/masonry-blade)
-
-<div align="center">
-  <img width="300" src="./.github/logo.png" alt="masonry-blade logo">
-</div>
 
 ## Быстрый старт
 
@@ -296,21 +298,9 @@ try {
 
 > Внутреннее состояние матрицы мутируется, а возвращаемые колонки являются ссылками на это состояние. Не изменяй их вручную через `push`, `splice`, прямое присваивание и подобные операции.
 
-## Разработка
+## Внести вклад
 
-### Подготовка окружения
-
-```bash
-git clone https://github.com/steelWinds/masonry-blade
-
-cd masonry-blade
-
-# Установить зависимости
-pnpm i
-
-# Запустить тесты
-pnpm test:run
-```
+Для дальнейших инструкции [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Бенчмарк
 
@@ -323,6 +313,10 @@ pnpm benchmark
 ## Лицензия
 
 Проект распространяется по лицензии MPL 2.0.
+
+## Безопасность
+
+Для дальнейших инструкции [SECURITY.md](SECURITY.md)
 
 ## Ссылки
 
