@@ -10,6 +10,7 @@
 Если в текущем окружении доступен `Web Worker`, вычисления выносятся в него.
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
+[![Module type: ESM](https://img.shields.io/badge/module%20type-esm-brightgreen)](https://github.com/voxpelli/badges-cjs-esm)
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
 [![CodeQL](https://github.com/steelWinds/masonry-blade/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/codeql.yml)
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)

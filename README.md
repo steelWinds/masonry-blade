@@ -10,6 +10,7 @@ Zero-dependency engine for calculating masonry-style image grids.
 If `Web Worker` is available in the current environment, calculations are offloaded to it.
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
+[![Module type: ESM](https://img.shields.io/badge/module%20type-esm-brightgreen)](https://github.com/voxpelli/badges-cjs-esm)
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
 [![CodeQL](https://github.com/steelWinds/masonry-blade/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/codeql.yml)
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)
