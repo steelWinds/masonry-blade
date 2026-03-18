@@ -1,6 +1,6 @@
 {
 	"name": "masonry-blade",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": false,
 	"description": "Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Worker-powered😱 calculations, and guaranteed column height differences no greater than 30%.",
 	"keywords": [
