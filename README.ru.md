@@ -11,9 +11,13 @@
 [English version](./README.md)
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
-![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
+
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)
+![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
+![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/masonry-blade)
+
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
+[![codecov](https://codecov.io/gh/steelWinds/masonry-blade/graph/badge.svg?token=48NKR93X2A)](https://codecov.io/gh/steelWinds/masonry-blade)
 
 <div align="center">
   <img width="300" src="./.github/logo.png" alt="masonry-blade logo">
