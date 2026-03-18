@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Oxlint
-        run: pnpm lint:fix
+        run: pnpm lint
 
       - name: Run Oxfmt
         run: pnpm fmt:check

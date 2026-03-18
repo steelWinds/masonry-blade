@@ -1,12 +1,15 @@
 {
 	"name": "masonry-blade",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"private": false,
-	"description": "Algo-oriented lib for creating masonry grids with ZERO dependencies😭, Web Worker-powered😱 calculations, and guaranteed column height differences no greater than 30%.",
+	"description": "Algo-oriented library for calculating masonry grids with zero dependencies 🧱 It uses Web Worker-based computation when a worker is available.",
 	"keywords": [
-		"generate",
+		"engine",
 		"lib",
-		"masonry"
+		"low-level",
+		"masonry",
+		"masonry-grid",
+		"masonry-js"
 	],
 	"homepage": "https://github.com/steelWinds/masonry-blade",
 	"bugs": {
