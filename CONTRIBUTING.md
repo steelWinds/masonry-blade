@@ -1,24 +1,24 @@
 # Contributing to masonry-blade
 
-Thanks for your interest in contributing to `masonry-blade` ❤️
+Thanks for your interest in contributing to `masonry-blade`.
 
-This project is a low-level masonry layout engine focused on predictable behavior, small surface area, and zero runtime dependencies. Contributions are welcome, but please keep changes focused and minimal.
+`masonry-blade` is a low-level masonry layout engine with a small API surface, predictable behavior, and zero runtime dependencies. Contributions are welcome, but changes should stay focused and justified.
 
-## Before You Start
+## Before you open an issue or PR
 
-Please first check:
+Please check:
 
-- the existing issues
-- the current README / API behavior
-- whether the change is a bug fix, documentation improvement, test improvement, or a narrowly scoped feature
+- existing issues and pull requests
+- the current README and public API behavior
+- whether the change is a bug fix, test improvement, docs improvement, or a narrowly scoped feature
 
-For security-related reports, please **do not** open a public issue. Follow the instructions in `SECURITY.md`.
+For security issues, do not open a public issue. See `SECURITY.md`.
 
-## Development Setup
+## Development setup
 
 ### Requirements
 
-- Node.js `>=18`
+- Node.js `>=20.19.0`
 - `pnpm`
 
 ### Install
@@ -29,7 +29,7 @@ cd masonry-blade
 pnpm install
 ```
 
-## Useful Commands
+## Available commands
 
 ```bash
 pnpm build
@@ -43,66 +43,75 @@ pnpm fmt:check
 pnpm benchmark
 ```
 
-## Contribution Types
+## What makes a good contribution
 
-Good contributions include:
+Good contributions usually include:
 
 - bug fixes
-- tests for edge cases
-- documentation clarifications
-- type improvements
-- performance improvements with evidence
-- small API improvements that do not make the library more complex
+- tests for edge cases and regressions
+- documentation improvements
+- type-level improvements
+- performance improvements backed by evidence
+- small API improvements that keep the library simple
 
-Please avoid sending large unrelated changes in one PR.
+Please avoid unrelated changes in the same pull request.
 
-## Guidelines
+## Project boundaries
 
-### Keep the scope small
+This library is intentionally narrow.
 
-This library is intentionally narrow:
+It is:
 
-- it is an engine, not a UI component
-- it does not manage DOM rendering
-- it does not implement framework-specific integrations
-- it currently works with image-based masonry input
+- a masonry layout engine
+- framework-agnostic
+- focused on image-based masonry input
+
+It is not:
+
+- a UI component
+- a DOM renderer
+- a framework integration layer
 
 If you want to propose a broader feature, open an issue first and explain the use case.
 
-### Preserve API clarity
+## Contribution guidelines
 
-Try to avoid changes that:
+### Keep the scope small
 
-- increase surface area without strong value
-- introduce implicit behavior
-- make the matrix state harder to reason about
-- couple the library to a specific framework or rendering strategy
+Prefer changes that solve one problem well.
 
-### Prefer explicit tests
+Avoid changes that:
 
-For behavior changes, please add or update tests.
+- increase the public API without strong value
+- add implicit or hard-to-explain behavior
+- make internal state harder to reason about
+- couple the project to a specific framework or rendering strategy
 
-Especially useful are tests for:
+### Add tests for behavior changes
+
+If you change behavior, add or update tests.
+
+Especially useful tests cover:
 
 - invalid input handling
 - matrix state mutations
-- resize / matrix recreation behavior
+- resize and matrix recreation behavior
 - item ordering guarantees
-- concurrency / serialization expectations
+- concurrency and serialization expectations
 - worker and non-worker execution paths
-- edge cases around zero/empty states
+- zero and empty-state edge cases
 
 ### Be careful with performance claims
 
-If your change improves performance, include one of the following:
+If a change improves performance, include at least one of the following:
 
 - a benchmark update
 - a reproducible measurement
 - a short explanation of the trade-off
 
-Do not optimize readability away for tiny wins unless the gain is clearly meaningful.
+Do not trade away readability for tiny gains unless the benefit is clear.
 
-## Pull Requests
+## Pull requests
 
 ### Before opening a PR
 
@@ -115,47 +124,47 @@ pnpm test:run
 pnpm build
 ```
 
-If your change affects performance-sensitive code, also run:
+If your change touches performance-sensitive code, also run:
 
 ```bash
 pnpm benchmark
 ```
 
-### PR recommendations
+### What a good PR looks like
 
-A good PR should:
+A good pull request should:
 
 - have a clear title
-- explain **what** changed and **why**
+- explain what changed and why
 - stay focused on one problem
 - include tests when applicable
 - update documentation when public behavior changes
 
-### PR size
+### Keep PRs small
 
-Smaller PRs are much easier to review and merge.
+Smaller pull requests are easier to review and merge.
 
-If possible, split unrelated refactors from actual behavior changes.
+If possible, separate refactors from behavior changes.
 
-## Commit Style
+## Commit style
 
-Follow the instructions with [Conventional Commits](https://www.conventionalcommits.org)
+Please follow [Conventional Commits](https://www.conventionalcommits.org).
 
-## Reporting Bugs
+## Bug reports
 
-When opening a bug report, please include:
+When reporting a bug, include:
 
 - package version
-- runtime/environment
+- runtime or environment details
 - minimal reproduction
 - expected behavior
 - actual behavior
 
-A small code sample is much better than a long description.
+A small reproducible example is much more useful than a long description.
 
-## Suggesting Features
+## Feature requests
 
-Feature requests are welcome, but please keep in mind the project goals:
+Feature requests are welcome, but they should fit the project goals:
 
 - small
 - predictable
@@ -166,22 +175,23 @@ When proposing a feature, explain:
 
 - the problem
 - why the current API is not enough
-- the smallest possible addition that solves it
+- the smallest useful addition
 
-## Documentation Contributions
+## Documentation contributions
 
-Docs improvements are always welcome, especially if they improve:
+Documentation improvements are always useful, especially when they improve:
 
 - wording clarity
 - API explanations
 - examples
 - edge-case notes
-- English/Russian consistency
+- consistency across English and Russian docs
 
-## Code Style
+## Code style
 
-The project uses automated formatting and linting tools.
-Please let the configured tools define formatting and avoid manual stylistic churn.
+The project uses automated formatting and linting.
+
+Please rely on the configured tools and avoid manual stylistic churn.
 
 ## License
 
@@ -190,4 +200,5 @@ By contributing, you agree that your contributions will be distributed under the
 ## Thanks
 
 Thanks for helping improve `masonry-blade`.
-Focused contributions, careful tests, and clear explanations are especially appreciated.
+
+Focused changes, clear reasoning, and careful tests are especially valuable.

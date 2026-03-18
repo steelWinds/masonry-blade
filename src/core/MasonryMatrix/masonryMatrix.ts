@@ -11,7 +11,7 @@ import { MATRIX_ERROR_MESSAGES, MatrixError } from './errors/index.ts';
  * Concurrent calls to appendItems/recreateMatrix are not allowed.
  * The caller must serialize access.
  *
- * appendItems mutates the passed state.
+ * appendItems mutates the current matrix state.
  * Returned columns must be treated as read-only by the caller.
  */
 

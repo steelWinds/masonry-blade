@@ -1,56 +1,56 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-`masonry-blade` is a young project. Security fixes are typically provided for the latest release only.
+`masonry-blade` is a young project. Security fixes are generally provided for the latest release only.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest  | :white_check_mark: |
-| Older   | :x:                |
+| Version | Supported |
+| ------- | --------- |
+| Latest  | ✅        |
+| Older   | ❌        |
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Please **do not** report security issues through public GitHub issues.
+Please do not report security issues through public GitHub issues.
 
-Use one of the following private channels instead:
+Use one of these private channels instead:
 
-- **GitHub Private Vulnerability Reporting** (preferred)
+- GitHub Private Vulnerability Reporting
 - Email: **kirillsurov0@gmail.com**
 
-Reports may be submitted in **English or Russian**.
+Reports may be submitted in English or Russian.
 
-Please include:
+To help with triage, please include:
 
 - affected version
-- runtime/environment details
+- runtime or environment details
 - reproduction steps
-- sample input/data
+- sample input or data
 - impact description
-- any proposed mitigation, if available
+- possible mitigation, if available
 
-## Scope
+## Security scope
 
-Security-relevant issues may include:
+Issues that may be security-relevant include:
 
-- denial-of-service through specially crafted image metadata or input sets
+- denial of service caused by specially crafted image metadata or input sets
 - excessive CPU or memory consumption with realistic exploit potential
-- worker-related message handling vulnerabilities
+- worker-related message handling issues with real security impact
 - package publishing or supply-chain compromise
-- confirmed vulnerable dependencies with real impact on consumers
+- confirmed vulnerable dependencies that can affect consumers
 
-The following are generally out of scope unless they create a real security impact:
+The following are usually out of scope unless they create a real security impact:
 
 - imperfect masonry balancing
 - incorrect column distribution
 - rendering differences between environments
-- ordinary bugs, docs issues, or feature requests
+- ordinary bugs, documentation issues, or feature requests
 
-## Response Process
+## Response process
 
 The maintainer will try to:
 
-- acknowledge receipt within **7 days**
+- acknowledge receipt within 7 days
 - investigate and validate the report
 - prepare a fix or mitigation when needed
 - coordinate responsible disclosure
