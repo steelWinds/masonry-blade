@@ -1,0 +1,11 @@
+name: masonry-blade codeql config
+
+paths:
+  - src
+
+paths-ignore:
+  - tests
+  - benchmark
+  - build
+  - '**/*.test.ts'
+  - '**/*.spec.ts'

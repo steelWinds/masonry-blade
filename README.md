@@ -1,5 +1,9 @@
 # masonry-blade
 
+<p>
+  <img align="right" width="30%" src="./.github/logo.png" alt="masonry-blade logo">
+</p>
+
 Algo-oriented library for calculating masonry grids with zero dependencies 🧱 It uses Web Worker-based computation when a worker is available.
 
 > Internally, the matrix is balanced with a greedy strategy: each next item is placed into the current shortest column. This is not a formal guarantee of a fixed height gap, but in practice it gives an almost ideal quality/speed trade-off for this kind of engine.
@@ -12,16 +16,14 @@ Algo-oriented library for calculating masonry grids with zero dependencies 🧱 
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 
+[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
+[![CodeQL](https://github.com/steelWinds/masonry-blade/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/codeql.yml)
+
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)
 ![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/masonry-blade)
 
-[![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
 [![codecov](https://codecov.io/gh/steelWinds/masonry-blade/graph/badge.svg?token=48NKR93X2A)](https://codecov.io/gh/steelWinds/masonry-blade)
-
-<div align="center">
-  <img width="300" src="./.github/logo.png" alt="masonry-blade logo">
-</div>
 
 ## Quick start
 
@@ -296,21 +298,9 @@ Available error messages:
 
 > The matrix state is mutable internally, and returned columns are references to that state. Do not mutate them manually with `push`, `splice`, direct assignment, and so on.
 
-## Development
+## Сontributing
 
-### Setup for Development
-
-```bash
-git clone https://github.com/steelWinds/masonry-blade
-
-cd masonry-blade
-
-# Install dependencies
-pnpm i
-
-# Run tests
-pnpm test:run
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) file
 
 ### Benchmark
 
@@ -323,6 +313,10 @@ Latest benchmark results: [benchmark/benchmark-results.md](benchmark/benchmark-r
 ## License
 
 This project is licensed under the MPL 2.0 License.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) file
 
 ## Links
 
