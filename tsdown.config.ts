@@ -6,7 +6,7 @@ export default defineConfig({
 		tests: './tests',
 	},
 	attw: {
-		profile: 'node16',
+		profile: 'esm-only',
 	},
 	define: {
 		'import.meta.env.APPEND_TO_MATRIX_WORKER': JSON.stringify('./worker.js'),
