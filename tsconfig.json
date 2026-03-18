@@ -1,14 +1,14 @@
 {
 	"compilerOptions": {
 		"target": "ES2022",
-		"module": "nodenext",
+		"module": "esnext",
 		"types": ["@types/node"],
 		"skipLibCheck": true,
 		"useDefineForClassFields": true,
 		"strictPropertyInitialization": false,
 
 		/* Bundler mode */
-		"moduleResolution": "nodenext",
+		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"moduleDetection": "force",
