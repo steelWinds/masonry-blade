@@ -3,7 +3,16 @@ import type {
 	MatrixItem,
 	MatrixState,
 } from 'src/core/MasonryMatrix/internal/matrixEngine/index.ts';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+	vi,
+} from 'vitest';
 import { FAKER_SEED } from 'tests/constants.ts';
 import { MATRIX_ERROR_MESSAGES } from 'src/core/MasonryMatrix/errors/index.ts';
 import { MasonryMatrix } from 'src/core/MasonryMatrix/index.ts';
@@ -30,7 +39,7 @@ type WorkerPayload = {
 };
 
 class FakeWorker {
-	public scriptPath: string;
+	public scriptURL: URL;
 	public options?: WorkerOptions;
 	public onmessage: ((event: MessageEvent<MatrixState>) => void) | null = null;
 	public onmessageerror: ((event: MessageEvent<unknown>) => void) | null = null;
@@ -56,8 +65,8 @@ class FakeWorker {
 		this.onerror?.({ message } as ErrorEvent);
 	});
 
-	constructor(scriptPath: string, options?: WorkerOptions) {
-		this.scriptPath = scriptPath;
+	constructor(scriptURL: URL, options?: WorkerOptions) {
+		this.scriptURL = scriptURL;
 		this.options = options;
 	}
 }
@@ -89,13 +98,19 @@ const makeState = (
 	width: rootWidth / count,
 });
 
-const installWorkerMock = () => {
+const installWorkerMock = (options?: {
+	postMessageImpl?: (this: FakeWorker, payload: WorkerPayload) => void;
+}) => {
 	const instances: FakeWorker[] = [];
 
 	const WorkerMock = vi.fn(
 		class extends FakeWorker {
-			constructor(scriptPath: string, options?: WorkerOptions) {
-				super(scriptPath, options);
+			constructor(scriptURL: URL, optionsArg?: WorkerOptions) {
+				super(scriptURL, optionsArg);
+
+				if (options?.postMessageImpl) {
+					this.postMessage.mockImplementation(options.postMessageImpl);
+				}
 
 				instances.push(this);
 			}
@@ -108,6 +123,16 @@ const installWorkerMock = () => {
 };
 
 describe('MasonryMatrix', () => {
+	const WORKER_FILE_PATH = faker.system.fileName();
+
+	beforeAll(() => {
+		vi.stubEnv('APPEND_TO_MATRIX_WORKER', WORKER_FILE_PATH);
+	});
+
+	afterAll(() => {
+		vi.unstubAllEnvs();
+	});
+
 	beforeEach(() => {
 		faker.seed(FAKER_SEED);
 
@@ -171,8 +196,8 @@ describe('MasonryMatrix', () => {
 			const [worker] = instances;
 
 			expect(worker).toBeDefined();
-			expect(worker.scriptPath).toBeTypeOf('string');
-			expect(worker.scriptPath).toContain('appendToMatrix.worker.ts');
+			expect(worker.scriptURL).toBeInstanceOf(URL);
+			expect(worker.scriptURL.href).toContain(WORKER_FILE_PATH);
 			expect(worker.options).toEqual({ type: 'module' });
 
 			expect(worker.postMessage).toHaveBeenCalledOnce();
@@ -325,6 +350,47 @@ describe('MasonryMatrix', () => {
 				message: MATRIX_ERROR_MESSAGES.APPEND_ITEMS,
 			});
 		});
+
+		test('returns current columns for a concurrent appendItems call and does not start a second worker job', async () => {
+			const initialState = makeState(2, 500);
+			const resolvedState = makeState(2, 500, [[makePlacedItem(250)], []]);
+
+			const firstBatch = makeImageItems(2);
+			const secondBatch = makeImageItems(3);
+
+			createMatrixStateMock.mockReturnValue(initialState);
+
+			const { WorkerMock, instances } = installWorkerMock();
+			const matrix = new MasonryMatrix(500, 2);
+
+			const firstPending = matrix.appendItems(firstBatch);
+
+			expect(WorkerMock).toHaveBeenCalledOnce();
+
+			const [worker] = instances;
+
+			expect(worker.postMessage).toHaveBeenCalledOnce();
+			expect(worker.postMessage).toHaveBeenCalledWith({
+				batchItems: firstBatch,
+				state: initialState,
+			});
+
+			const secondPending = matrix.appendItems(secondBatch);
+
+			await expect(secondPending).rejects.toMatchObject({
+				message: MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
+			});
+
+			expect(worker.postMessage).toHaveBeenCalledTimes(1);
+			expect(worker.postMessage).not.toHaveBeenCalledWith({
+				batchItems: secondBatch,
+				state: expect.anything(),
+			});
+
+			worker.emitMessage(resolvedState);
+
+			await expect(firstPending).resolves.toBe(resolvedState.columns);
+		});
 	});
 
 	describe('recreateMatrix', () => {
@@ -363,8 +429,8 @@ describe('MasonryMatrix', () => {
 			const [worker] = instances;
 
 			expect(worker).toBeDefined();
-			expect(worker.scriptPath).toBeTypeOf('string');
-			expect(worker.scriptPath).toContain('appendToMatrix.worker.ts');
+			expect(worker.scriptURL).toBeInstanceOf(URL);
+			expect(worker.scriptURL.href).toContain(WORKER_FILE_PATH);
 			expect(worker.options).toEqual({ type: 'module' });
 
 			expect(worker.postMessage).toHaveBeenCalledOnce();
@@ -480,6 +546,89 @@ describe('MasonryMatrix', () => {
 				[...batchA, ...batchB],
 			);
 			expect(columns).toBe(recreatedFinalState.columns);
+		});
+
+		test('returns current columns for a concurrent recreateMatrix call and does not start a new job', async () => {
+			const initialState = makeState(2, 600);
+			const resolvedState = makeState(2, 600, [[makePlacedItem(300)], []]);
+
+			const batch = makeImageItems(2);
+
+			createMatrixStateMock.mockReturnValue(initialState);
+
+			const { WorkerMock, instances } = installWorkerMock();
+			const matrix = new MasonryMatrix(600, 2);
+
+			const appendPending = matrix.appendItems(batch);
+
+			expect(WorkerMock).toHaveBeenCalledOnce();
+
+			const [worker] = instances;
+
+			expect(worker.postMessage).toHaveBeenCalledOnce();
+			expect(worker.postMessage).toHaveBeenCalledWith({
+				batchItems: batch,
+				state: initialState,
+			});
+
+			const recreatePending = matrix.recreateMatrix(900, 3);
+
+			await expect(recreatePending).rejects.toMatchObject({
+				message: MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
+			});
+
+			expect(createMatrixStateMock).toHaveBeenCalledTimes(1);
+			expect(worker.postMessage).toHaveBeenCalledTimes(1);
+
+			worker.emitMessage(resolvedState);
+
+			await expect(appendPending).resolves.toBe(resolvedState.columns);
+		});
+	});
+
+	describe('Worker', () => {
+		test('rejects when worker.postMessage throws DataCloneError for a non-cloneable payload', async () => {
+			const initialState = makeState(2, 480);
+
+			createMatrixStateMock.mockReturnValue(initialState);
+
+			const dataCloneError =
+				typeof DOMException !== 'undefined'
+					? new DOMException(
+							'Failed to execute postMessage on Worker: value could not be cloned.',
+							'DataCloneError',
+						)
+					: Object.assign(new Error('Value could not be cloned.'), {
+							name: 'DataCloneError',
+						});
+
+			installWorkerMock({
+				postMessageImpl() {
+					throw dataCloneError;
+				},
+			});
+
+			const matrix = new MasonryMatrix<{ callback: () => void }>(480, 2);
+
+			const batch: ImageItem<{ callback: () => void }>[] = [
+				{
+					height: 200,
+					id: faker.string.uuid(),
+					meta: {
+						callback: () => {},
+					},
+					src: faker.internet.url(),
+					width: 300,
+				},
+			];
+
+			await expect(matrix.appendItems(batch)).rejects.toMatchObject({
+				cause: {
+					cause: dataCloneError,
+					message: MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE,
+				},
+				message: MATRIX_ERROR_MESSAGES.APPEND_ITEMS,
+			});
 		});
 	});
 });

@@ -1,16 +1,26 @@
 import { defineConfig } from 'tsdown';
-import workerPlugins from 'tsdown-plugin-worker';
 
 export default defineConfig({
 	alias: {
-		lib: './lib',
 		src: './src',
 		tests: './tests',
 	},
+	attw: {
+		profile: 'esm-only',
+	},
+	define: {
+		'import.meta.env.APPEND_TO_MATRIX_WORKER': JSON.stringify('./worker.js'),
+	},
 	dts: true,
-	entry: 'src/app/index.ts',
+	entry: {
+		index: 'src/core/MasonryMatrix/index.ts',
+		worker:
+			'src/core/MasonryMatrix/internal/matrixEngine/appendToMatrix.worker.ts',
+	},
+	exports: true,
 	ignoreWatch: ['node_modules', 'build', '__tests__'],
 	outDir: './build',
 	platform: 'neutral',
-	plugins: [workerPlugins({ format: 'es' })],
+	publint: true,
+	shims: true,
 });

@@ -479,7 +479,7 @@ function buildMarkdownReport(params: {
 		`- V8: ${machineAtStart.v8}`,
 		`- Seed: ${FAKER_SEED}`,
 		`- Root width: ${ROOT_WIDTH}`,
-		`- GC exposed: ${typeof globalThis.gc === 'function' ? 'yes' : 'no'}`,
+		`- GC exposed: yes`,
 		'',
 		'## Benchmark configuration',
 		'',

@@ -1,37 +1,40 @@
 # masonry-blade
 
+## [English version](./README.md)
+
 <p>
   <img align="right" width="30%" src="./.github/logo.png" alt="masonry-blade logo">
 </p>
 
-Библиотека для расчёта masonry-сеток без зависимостей 🧱 Если в окружении доступен Web Worker, вычисления будут выполняться через него.
-
-> Внутри используется жадная балансировка: каждый следующий элемент ставится в самую низкую колонку. Это не формальная гарантия фиксированного разрыва по высоте, но на практике даёт почти идеальный баланс по соотношению качество/скорость для такого типа движка.
-
-> Сейчас поддерживаются только изображения. Это именно **движок** для построения masonry-матрицы без работы с интерфейсом.
-
-> Сделано с любовью. ❤️
-
-[English version](./README.md)
+Библиотека без зависимостей для расчета masonry-сетки изображений.
+Если в текущем окружении доступен `Web Worker`, вычисления выносятся в него.
 
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
-
+[![Module type: ESM](https://img.shields.io/badge/module%20type-esm-brightgreen)](https://github.com/voxpelli/badges-cjs-esm)
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
 [![CodeQL](https://github.com/steelWinds/masonry-blade/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/codeql.yml)
-
 ![NPM Version](https://img.shields.io/npm/v/masonry-blade)
 ![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/masonry-blade)
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/masonry-blade)
-
 [![codecov](https://codecov.io/gh/steelWinds/masonry-blade/graph/badge.svg?token=48NKR93X2A)](https://codecov.io/gh/steelWinds/masonry-blade)
 
-## Быстрый старт
+## Что делает библиотека
 
-`masonry-blade` — это движок для расчёта masonry-матрицы.
+`masonry-blade` рассчитывает masonry-матрицу для изображений.
 
-Он **не рендерит интерфейс**, а только раскладывает изображения по колонкам и возвращает готовую структуру данных для твоего интерфейса.
+Она не рендерит UI.
+Библиотека только раскладывает элементы по колонкам одинаковой ширины и возвращает структуру данных, которую можно отрисовать в любом интерфейсе.
 
-### Установка
+## Зачем использовать
+
+- Ноль зависимостей.
+- Не привязана к UI-фреймворку.
+- Может выносить вычисления в `Web Worker`.
+- Поддерживает дозагрузку новых элементов.
+- Может полностью пересобрать матрицу при ресайзе без повторной передачи исходных данных.
+- Поддерживает типизированное поле `meta` для пользовательских данных.
+
+## Установка
 
 ```bash
 npm i masonry-blade
@@ -45,7 +48,7 @@ yarn add masonry-blade
 pnpm add masonry-blade
 ```
 
-### Публичный API
+## Публичное API
 
 ```ts
 import {
@@ -57,50 +60,15 @@ import {
 } from 'masonry-blade';
 ```
 
-Публично доступны:
+Экспортируется:
 
 - `MasonryMatrix` — основной класс для построения матрицы.
 - `MatrixError` — кастомная ошибка библиотеки.
-- `MATRIX_ERROR_MESSAGES` — константы сообщений ошибок.
-- `ImageItem<T>` — входной элемент.
-- `MatrixItem<T>` — элемент после размещения в матрице.
+- `MATRIX_ERROR_MESSAGES` — экспортируемые константы с текстами ошибок.
+- `ImageItem<T>` — тип входного элемента.
+- `MatrixItem<T>` — тип элемента после размещения в матрице.
 
-### Как это работает
-
-1. Создаёшь экземпляр `MasonryMatrix` с шириной контейнера и количеством колонок.
-2. Передаёшь изображения через `appendItems(...)`.
-3. Получаешь массив колонок.
-4. При изменении ширины контейнера вызываешь `recreateMatrix(...)`, чтобы пересчитать раскладку из уже добавленных элементов.
-
-> `recreateMatrix(...)` не требует повторно передавать элементы: библиотека пересчитает матрицу из уже накопленного списка исходных элементов.
-
-> Ширина каждого элемента в результате всегда равна ширине колонки, а высота пересчитывается пропорционально исходному соотношению сторон.
-
-### Входные и выходные типы
-
-```ts
-type ImageItem<T = never> = {
-	id: number | string;
-	src: string;
-	width: number;
-	height: number;
-} & (T extends never ? {} : { meta: T });
-
-// концептуальная форма
-
-type MatrixItem<T = never> = {
-	id: number | string;
-	src: string;
-	width: number; // ширина колонки
-	height: number; // пересчитанная высота внутри матрицы
-} & (T extends never ? {} : { meta: T });
-```
-
-> `meta` удобно использовать для любых связанных данных: `alt`, `title`, `author`, `href`, внутренний id, флаги и так далее.
-
-> Внутри библиотеки есть внутренний тип `Meta<T>` как идея “элемент + пользовательские данные”. Он не экспортируется отдельно, но логика публичного API именно такая: если указываешь generic `T`, у `ImageItem<T>` и `MatrixItem<T>` появляется поле `meta: T`.
-
-### Пример: минимальное использование
+## Быстрый старт
 
 ```ts
 import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
@@ -138,7 +106,54 @@ console.log(columns);
 // ]
 ```
 
-### Пример: использование с `meta`
+## Как это работает
+
+1. Создайте `MasonryMatrix`, передав ширину контейнера и число колонок.
+2. Передайте элементы в `appendItems(...)`.
+3. Отрисуйте возвращенные колонки в своем UI.
+4. Вызывайте `recreateMatrix(...)`, когда меняется ширина или число колонок.
+
+`recreateMatrix(...)` пересобирает раскладку на основе внутреннего списка уже добавленных исходных элементов.
+Повторно передавать те же данные не нужно.
+
+Каждый элемент на выходе всегда получает текущую ширину колонки.
+Высота пересчитывается пропорционально на основе исходного соотношения сторон.
+
+## Стратегия раскладки
+
+Каждый следующий элемент кладется в самую низкую на текущий момент колонку.
+
+Это жадная стратегия балансировки.
+Она не дает формальной гарантии фиксированного максимального разрыва по высоте между колонками, но для такого типа движка дает хороший баланс между качеством и скоростью.
+
+Библиотека работает только с изображениями.
+`width` и `height` должны быть известны заранее.
+
+## Типы
+
+```ts
+type ImageItem<T = never> = {
+	id: number | string;
+	src: string;
+	width: number;
+	height: number;
+} & (T extends never ? {} : { meta: T });
+
+// conceptual shape
+
+type MatrixItem<T = never> = {
+	id: number | string;
+	src: string;
+	width: number; // column width
+	height: number; // scaled height inside the matrix
+} & (T extends never ? {} : { meta: T });
+```
+
+Поле `meta` удобно для любых связанных данных: `alt`, `title`, `author`, `href`, внутренних ID, флагов и так далее.
+
+Если вы передаете generic `T`, и `ImageItem<T>`, и `MatrixItem<T>` будут содержать `meta: T`.
+
+## Пример с `meta`
 
 ```ts
 import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
@@ -184,7 +199,7 @@ console.log(firstItem.meta.author);
 // Kate
 ```
 
-### Пример: пересчёт матрицы при изменении размера
+## Пример: пересборка при ресайзе
 
 ```ts
 import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
@@ -214,7 +229,7 @@ console.log(mobileColumns.length);
 
 ### `new MasonryMatrix(rootWidth, count?)`
 
-Создаёт новый экземпляр матрицы.
+Создает новый экземпляр матрицы.
 
 | Параметр    | Тип      | Обязателен | Описание                             |
 | ----------- | -------- | ---------- | ------------------------------------ |
@@ -229,21 +244,22 @@ console.log(mobileColumns.length);
 appendItems(items: readonly ImageItem<T>[]): Promise<readonly MatrixItem<T>[][]>
 ```
 
-> Подходит для первичной загрузки, бесконечной прокрутки и поэтапной дозагрузки изображений.
+Подходит для первой загрузки, infinite scroll и поэтапной подгрузки изображений.
 
 ### `await recreateMatrix(rootWidth, count?)`
 
-Полностью пересоздаёт матрицу с новой шириной контейнера и/или новым числом колонок, используя **все ранее добавленные** элементы.
+Полностью пересобирает матрицу с новой шириной контейнера и/или новым числом колонок, используя все ранее добавленные элементы.
 
 ```ts
 recreateMatrix(rootWidth: number, count?: number): Promise<readonly MatrixItem<T>[][]>
 ```
 
-> Обычно вызывается при изменении размера контейнера, смене брейкпоинта или смене режима раскладки.
+Обычно используется при ресайзе, смене брейкпоинта или режима раскладки.
 
 ### `terminateWorker()`
 
-Принудительно завершает внутренний worker, если он был создан. Следующий вызов `appendItems(...)` или `recreateMatrix(...)` автоматически создаст новый worker заново.
+Принудительно завершает внутренний worker, если он был создан.
+Следующий вызов `appendItems(...)` или `recreateMatrix(...)` автоматически создаст новый worker.
 
 ## Ошибки
 
@@ -278,49 +294,91 @@ try {
 Доступные сообщения ошибок:
 
 - `MATRIX_ERROR_MESSAGES.APPEND_ITEMS`
+- `MATRIX_ERROR_MESSAGES.CONCURRENT_CALL`
 - `MATRIX_ERROR_MESSAGES.RECREATE_MATRIX`
 - `MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE`
 - `MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER`
 - `MATRIX_ERROR_MESSAGES.WORKER_ERROR`
 - `MATRIX_ERROR_MESSAGES.WORKER_TERMINATED`
 
+## Ограничения во время выполнения
+
+### Параллельные вызовы не поддерживаются
+
+Не вызывайте `appendItems(...)` и/или `recreateMatrix(...)` параллельно на одном и том же экземпляре `MasonryMatrix`.
+
+Эти операции должен сериализовать вызывающий код.
+
+Если второй вызов начинается до завершения предыдущего обновления матрицы, библиотека выбросит `MatrixError`.
+
+На практике это значит:
+
+- не запускайте второй `appendItems(...)`, пока не завершился первый;
+- не вызывайте `recreateMatrix(...)`, пока выполняется `appendItems(...)`;
+- не вызывайте `appendItems(...)`, пока выполняется `recreateMatrix(...)`.
+
+### В режиме Worker используется structured clone
+
+Если в текущем окружении доступен `Worker`, данные матрицы отправляются через `postMessage(...)`.
+
+Поэтому передаваемые данные должны быть совместимы с алгоритмом structured clone.
+
+В первую очередь это важно для `meta`, если вы используете `ImageItem<T>` / `MatrixItem<T>` с generic-типом.
+
+Не помещайте в `meta` значения, которые нельзя клонировать, например:
+
+- функции;
+- DOM-узлы;
+- экземпляры классов с несериализуемым внутренним состоянием;
+- неподдерживаемые кастомные объекты для вашей целевой среды.
+
+Если payload нельзя клонировать для передачи в worker, библиотека выбросит `MatrixError`.
+
+Типичные случаи:
+
+- `appendItems(...)` выбросит ошибку, если переданную пачку нельзя клонировать;
+- `recreateMatrix(...)` выбросит ошибку, если нельзя клонировать уже накопленные исходные элементы.
+
+Хорошее практическое правило: держать `meta` близким к JSON-подобным данным приложения.
+
+### Возвращаемые колонки — это ссылки на внутреннее состояние
+
+Относитесь к возвращаемым колонкам как к read-only данным.
+
+Не изменяйте их вручную через `push`, `splice`, прямое присваивание и так далее.
+
+В режиме worker не стоит полагаться на ссылочную идентичность `meta`, потому что данные передаются через structured clone.
+
 ## Важные замечания
 
-- Элементы с `width <= 0` или `height <= 0` игнорируются без ошибки.
-- `count = 0` допустим, но это режим пустой матрицы: ширина колонки будет `0`, а `appendItems(...)` ничего не разложит.
-- Библиотека поддерживает только изображения: `width` и `height` должны быть известны заранее.
-- Если в окружении нет `Worker`, библиотека продолжит работать без него — вычисления просто пойдут в основном потоке.
-- Возвращённые колонки нужно считать только для чтения, даже если в рантайме это обычные массивы.
-- `meta` передаётся по ссылке, если это объект.
-- Вызовы `appendItems(...)` и `recreateMatrix(...)` для одного экземпляра `MasonryMatrix` нужно сериализовать: не запускай их параллельно.
+- Элементы с `width <= 0` или `height <= 0` молча пропускаются.
+- `count = 0` допустим, но в этом режиме матрица будет пустой.
+- Если `Worker` недоступен, вычисления выполняются в основном потоке.
+- Библиотека ничего не знает о DOM, React, Vue, lazy loading, рендеринге карточек или стилях. Она только возвращает данные раскладки.
 
-> `masonry-blade` ничего не знает про DOM, React, Vue, рендеринг карточек, ленивую загрузку или стили. На выходе ты получаешь только данные, которые можно отрисовать в любом слое интерфейса.
-
-> Внутреннее состояние матрицы мутируется, а возвращаемые колонки являются ссылками на это состояние. Не изменяй их вручную через `push`, `splice`, прямое присваивание и подобные операции.
-
-## Внести вклад
-
-Для дальнейших инструкции [CONTRIBUTING.md](CONTRIBUTING.md)
-
-### Бенчмарк
+## Benchmark
 
 ```bash
 pnpm benchmark
 ```
 
-Последние результаты бенчмарка: [benchmark/benchmark-results.md](benchmark/benchmark-results.md)
+Актуальные результаты: [benchmark/benchmark-results.md](benchmark/benchmark-results.md)
+
+## Участие в разработке
+
+См. [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Безопасность
+
+См. [SECURITY.md](SECURITY.md)
 
 ## Лицензия
 
 Проект распространяется по лицензии MPL 2.0.
 
-## Безопасность
-
-Для дальнейших инструкции [SECURITY.md](SECURITY.md)
-
 ## Ссылки
 
 - Автор: [@steelWinds](https://github.com/steelWinds)
-- Issues: [New issue](https://github.com/steelWinds/masonry-blade/issues)
+- Issues: [Создать issue](https://github.com/steelWinds/masonry-blade/issues)
 - Telegram: @plutograde
-- Email: [Написать на email](mailto:kirillsurov0@gmail.com)
+- Email: [Написать на почту](mailto:kirillsurov0@gmail.com)

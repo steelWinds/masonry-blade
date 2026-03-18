@@ -1,24 +1,20 @@
 {
 	"compilerOptions": {
 		"target": "ES2022",
-		"module": "nodenext",
-		"types": ["@types/node", "tsdown-plugin-worker/types"],
+		"module": "esnext",
+		"types": ["@types/node"],
 		"skipLibCheck": true,
-		"experimentalDecorators": true,
-		"emitDecoratorMetadata": true,
 		"useDefineForClassFields": true,
 		"strictPropertyInitialization": false,
-		"allowJs": true,
 
 		/* Bundler mode */
-		"moduleResolution": "nodenext",
+		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"moduleDetection": "force",
 		"noEmit": true,
 		"paths": {
 			"src/*": ["./src/*"],
-			"lib/*": ["./lib/*"],
 			"tests/*": ["./tests/*"]
 		},
 
@@ -30,5 +26,5 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true
 	},
-	"include": ["src", "lib", "tests", "benchmark"]
+	"include": ["src", "lib", "tests", "benchmark", "tsdown-env.d.ts"]
 }

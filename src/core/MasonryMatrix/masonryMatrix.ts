@@ -6,13 +6,12 @@ import {
 	createMatrixState,
 } from './internal/matrixEngine/index.ts';
 import { MATRIX_ERROR_MESSAGES, MatrixError } from './errors/index.ts';
-import AppendToMatrixWorker from './internal/matrixEngine/appendToMatrix.worker.ts?worker&inline';
 
 /**
  * Concurrent calls to appendItems/recreateMatrix are not allowed.
  * The caller must serialize access.
  *
- * appendItems mutates the passed state.
+ * appendItems mutates the current matrix state.
  * Returned columns must be treated as read-only by the caller.
  */
 
@@ -21,10 +20,12 @@ export class MasonryMatrix<T = never> {
 	private _workerTerminatedSignal?: (reason?: unknown) => void;
 	private _state: MatrixState<T>;
 	private _rawItems: ImageItem<T>[];
+	private _inFlight: boolean;
 
 	constructor(rootWidth: number, count?: number) {
 		this._state = createMatrixState<T>(rootWidth, count);
 		this._rawItems = [];
+		this._inFlight = false;
 	}
 
 	private async _updateState(
@@ -43,21 +44,22 @@ export class MasonryMatrix<T = never> {
 			return await new Promise<MatrixState<T>>((resolve, reject) => {
 				this._workerTerminatedSignal = reject;
 
-				this._worker!.onmessage = (e: MessageEvent<MatrixState<T>>) => {
+				const cleanup = () => {
 					this._workerTerminatedSignal = undefined;
+				};
 
+				this._worker!.onmessage = (e: MessageEvent<MatrixState<T>>) => {
+					cleanup();
 					resolve(e.data);
 				};
 
 				this._worker!.onmessageerror = () => {
-					this._workerTerminatedSignal = undefined;
-
+					cleanup();
 					reject(new MatrixError(MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER));
 				};
 
 				this._worker!.onerror = (e: ErrorEvent) => {
-					this._workerTerminatedSignal = undefined;
-
+					cleanup();
 					reject(
 						new MatrixError(MATRIX_ERROR_MESSAGES.WORKER_ERROR, { cause: e }),
 					);
@@ -85,7 +87,10 @@ export class MasonryMatrix<T = never> {
 
 	private _createWorker(): void {
 		if (globalThis && 'Worker' in globalThis) {
-			this._worker = new AppendToMatrixWorker();
+			this._worker = new Worker(
+				new URL(import.meta.env.APPEND_TO_MATRIX_WORKER, import.meta.url),
+				{ type: 'module' },
+			);
 		}
 	}
 
@@ -102,6 +107,12 @@ export class MasonryMatrix<T = never> {
 	async appendItems(
 		items: readonly ImageItem<T>[],
 	): Promise<readonly MatrixItem<T>[][]> {
+		if (this._inFlight) {
+			throw new MatrixError(MATRIX_ERROR_MESSAGES.CONCURRENT_CALL);
+		}
+
+		this._inFlight = true;
+
 		try {
 			this._state = await this._updateState(this._state, items);
 
@@ -110,6 +121,8 @@ export class MasonryMatrix<T = never> {
 			return this._state.columns;
 		} catch (e: unknown) {
 			throw new MatrixError(MATRIX_ERROR_MESSAGES.APPEND_ITEMS, { cause: e });
+		} finally {
+			this._inFlight = false;
 		}
 	}
 
@@ -117,16 +130,27 @@ export class MasonryMatrix<T = never> {
 		rootWidth: number,
 		count?: number,
 	): Promise<readonly MatrixItem<T>[][]> {
-		try {
-			this._state = createMatrixState<T>(rootWidth, count);
+		if (this._inFlight) {
+			throw new MatrixError(MATRIX_ERROR_MESSAGES.CONCURRENT_CALL);
+		}
 
-			this._state = await this._updateState(this._state, this._rawItems);
+		this._inFlight = true;
+
+		try {
+			const newState = await this._updateState(
+				createMatrixState<T>(rootWidth, count),
+				this._rawItems,
+			);
+
+			this._state = newState;
 
 			return this._state.columns as readonly MatrixItem<T>[][];
 		} catch (e: unknown) {
 			throw new MatrixError(MATRIX_ERROR_MESSAGES.RECREATE_MATRIX, {
 				cause: e,
 			});
+		} finally {
+			this._inFlight = false;
 		}
 	}
 }
