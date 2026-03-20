@@ -80,18 +80,18 @@ new MasonryMatrix<TMeta = never>(rootWidth: number, columnCount = 1, gap = 0)
 ### Methods
 
 ```ts
-await matrix.appendItems(items);
+await matrix.append(items);
 ```
 
 Appends a new batch of items to the current matrix and returns the columns.
 
 ```ts
-await matrix.recreateMatrix(rootWidth, columnCount?, gap?)
+await matrix.recreate(rootWidth, columnCount?, gap?)
 ```
 
 Rebuilds the matrix from scratch using **all previously accepted items** stored inside the instance.
-Items filtered out during `appendItems()` are not accumulated and do not take part in later rebuilds.
-If `columnCount` and `gap` are omitted, the last stored values are reused. At first these are the constructor values, then the values from the last successful `recreateMatrix(...)`.
+Items filtered out during `append()` are not accumulated and do not take part in later rebuilds.
+If `columnCount` and `gap` are omitted, the last stored values are reused. At first these are the constructor values, then the values from the last successful `recreate(...)`.
 
 ```ts
 matrix.terminateWorker();
@@ -155,7 +155,7 @@ import { MasonryMatrix } from 'masonry-blade';
 
 const matrix = new MasonryMatrix(1200, 3, 16);
 
-const columns = await matrix.appendItems([
+const columns = await matrix.append([
 	{ id: '1', width: 1600, height: 900 },
 	{ id: '2', width: 800, height: 1200 },
 	{ id: '3', width: 1000, height: 1000 },
@@ -164,7 +164,7 @@ const columns = await matrix.appendItems([
 console.log(columns);
 ```
 
-`appendItems()` and `recreateMatrix()` are always async. Even without a `Worker`, you still use `await`.
+`append()` and `recreate()` are always async. Even without a `Worker`, you still use `await`.
 
 ## How it works
 
@@ -185,7 +185,7 @@ This gives you a fast and visually even layout without complex heuristics.
 ## Example with `meta`
 
 `meta` does not affect layout calculation, but it travels through the matrix together with the item.
-If you create `MasonryMatrix<TMeta>`, every item passed to `appendItems(...)` must include `meta: TMeta`.
+If you create `MasonryMatrix<TMeta>`, every item passed to `append(...)` must include `meta: TMeta`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -198,7 +198,7 @@ type PhotoMeta = {
 
 const matrix = new MasonryMatrix<PhotoMeta>(960, 2, 12);
 
-const columns = await matrix.appendItems([
+const columns = await matrix.append([
 	{
 		id: 'photo-1',
 		width: 1600,
@@ -285,7 +285,7 @@ const render = (columns) => {
 async function main() {
 	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
 
-	render(await matrix.appendItems(initialItems));
+	render(await matrix.append(initialItems));
 }
 
 main();
@@ -293,7 +293,7 @@ main();
 
 ## Example: rebuild on resize
 
-`recreateMatrix()` takes all already accepted items and recalculates the grid.
+`recreate()` takes all already accepted items and recalculates the grid.
 
 ```js
 import { MasonryMatrix } from 'masonry-blade';
@@ -362,13 +362,13 @@ const render = (columns) => {
 async function main() {
 	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
 
-	render(await matrix.appendItems(initialItems));
+	render(await matrix.append(initialItems));
 
 	window.addEventListener('resize', async () => {
 		const width = container.clientWidth;
 		const columns = width < 768 ? 2 : width < 1200 ? 3 : 4;
 
-		const rebuilt = await matrix.recreateMatrix(width, columns);
+		const rebuilt = await matrix.recreate(width, columns);
 
 		render(rebuilt);
 	});
@@ -377,7 +377,7 @@ async function main() {
 main();
 ```
 
-If you call only `recreateMatrix(newWidth)`, the library does **not** reset the grid to `1` column and `gap = 0`. It reuses the last stored `columnCount` and `gap`.
+If you call only `recreate(newWidth)`, the library does **not** reset the grid to `1` column and `gap = 0`. It reuses the last stored `columnCount` and `gap`.
 
 ## Example: `Worker` control
 
@@ -390,11 +390,11 @@ let columns;
 
 matrix.disableWorker();
 
-columns = await matrix.appendItems([{ id: 1, width: 1, height: 1 }]); // guaranteed sync calculation
+columns = await matrix.append([{ id: 1, width: 1, height: 1 }]); // guaranteed sync calculation
 
 matrix.enableWorker();
 
-columns = await matrix.recreateMatrix(1200); // the library tries to use Worker again
+columns = await matrix.recreate(1200); // the library tries to use Worker again
 
 console.log(columns);
 ```
@@ -403,13 +403,13 @@ console.log(columns);
 
 ### Mutation source:
 
-- Do not mutate the columns or items returned by `appendItems()` and `recreateMatrix()`. The library keeps its internal state in the same structures. If you need a safe snapshot of service state, use `getState()`.
-- Do not mutate input items after passing them to `appendItems()`. Accepted raw items are stored internally and later reused by `recreateMatrix()`. Treat passed items and nested `meta` values as immutable, regardless of whether calculation ran synchronously or through a `Worker`.
+- Do not mutate the columns or items returned by `append()` and `recreate()`. The library keeps its internal state in the same structures. If you need a safe snapshot of service state, use `getState()`.
+- Do not mutate input items after passing them to `append()`. Accepted raw items are stored internally and later reused by `recreate()`. Treat passed items and nested `meta` values as immutable, regardless of whether calculation ran synchronously or through a `Worker`.
 - In worker mode, the payload sent to the worker goes through structured clone, but raw items stored inside the instance still remain the original accepted objects.
 
 ### Work with invalid items:
 
-- `appendItems()` silently skips items whose `width` or `height` is not a positive finite number. Such items do not enter the current layout and are not accumulated for future `recreateMatrix()` calls.
+- `append()` silently skips items whose `width` or `height` is not a positive finite number. Such items do not enter the current layout and are not accumulated for future `recreate()` calls.
 
 ### Concurrent:
 
@@ -442,8 +442,8 @@ Invalid matrix parameters:
 - `columnCount <= 0` or `columnCount` is not an integer
 - `gap < 0` or `gap` is not a finite number
 
-Invalid items passed to `appendItems()` do not throw. They are skipped instead. An item is skipped if its `width` or `height` is not a positive finite number.
-Skipped items do not enter the current layout and are not stored for future `recreateMatrix()` calls.
+Invalid items passed to `append()` do not throw. They are skipped instead. An item is skipped if its `width` or `height` is not a positive finite number.
+Skipped items do not enter the current layout and are not stored for future `recreate()` calls.
 
 Top-level errors are exposed as `MasonryMatrixError`. The `cause` may contain the original reason, including a `Worker` error, a structured clone / `postMessage(...)` error, or an engine validation error. A payload send failure usually appears as the original cause inside a `cause` chain wrapped by `Failed to update internal state`.
 

@@ -224,7 +224,7 @@ describe('MasonryMatrix', () => {
 	});
 
 	describe('getState', () => {
-		test('returns a snapshot of internal state and worker flags without leaking mutable typed arrays', async () => {
+		test('returns a snapshot of internal state and worker flags without leaking mutable typed arrays', () => {
 			const initialState = makeState({ count: 2, gap: 16, rootWidth: 420 });
 
 			initialState.columnsHeights.set([120, 340]);
@@ -279,7 +279,7 @@ describe('MasonryMatrix', () => {
 		});
 	});
 
-	describe('appendItems', () => {
+	describe('append', () => {
 		test('falls back to appendToMatrix when Worker is not available', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 480 });
 			const updatedState = makeState({
@@ -293,7 +293,7 @@ describe('MasonryMatrix', () => {
 			appendToMatrixMock.mockReturnValue(updatedState);
 
 			const matrix = new MasonryMatrix(480, 2);
-			const columns = await matrix.appendItems(batch);
+			const columns = await matrix.append(batch);
 
 			expect(appendToMatrixMock).toHaveBeenCalledOnce();
 			expect(appendToMatrixMock).toHaveBeenCalledWith(initialState, batch);
@@ -324,16 +324,17 @@ describe('MasonryMatrix', () => {
 			const { WorkerMock } = installThrowingWorkerMock();
 			const matrix = new MasonryMatrix(500, 2);
 
-			await expect(matrix.appendItems(firstBatch)).resolves.toBe(
+			await expect(matrix.append(firstBatch)).resolves.toBe(
 				stateAfterFirstAppend.columns,
 			);
 
-			await expect(matrix.appendItems(secondBatch)).resolves.toBe(
+			await expect(matrix.append(secondBatch)).resolves.toBe(
 				stateAfterSecondAppend.columns,
 			);
 
 			expect(WorkerMock).toHaveBeenCalledTimes(1);
 			expect(appendToMatrixMock).toHaveBeenCalledTimes(2);
+			expect(matrix.getState().workerDisabled).toBe(true);
 		});
 
 		test('creates a Worker and uses it when Worker is available', async () => {
@@ -350,7 +351,7 @@ describe('MasonryMatrix', () => {
 			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(900, 3);
 
-			const pending = matrix.appendItems(batch);
+			const pending = matrix.append(batch);
 
 			expect(WorkerMock).toHaveBeenCalledOnce();
 
@@ -394,13 +395,13 @@ describe('MasonryMatrix', () => {
 			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(500, 2);
 
-			const firstPending = matrix.appendItems(firstBatch);
+			const firstPending = matrix.append(firstBatch);
 			const [worker] = instances;
 
 			worker.emitMessage(stateAfterFirstAppend);
 			await expect(firstPending).resolves.toBe(stateAfterFirstAppend.columns);
 
-			const secondPending = matrix.appendItems(secondBatch);
+			const secondPending = matrix.append(secondBatch);
 
 			expect(WorkerMock).toHaveBeenCalledTimes(1);
 			expect(worker.postMessage).toHaveBeenNthCalledWith(2, {
@@ -428,7 +429,7 @@ describe('MasonryMatrix', () => {
 			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(400, 2);
 
-			const firstPending = matrix.appendItems(firstBatch);
+			const firstPending = matrix.append(firstBatch);
 			const [firstWorker] = instances;
 
 			matrix.terminateWorker();
@@ -445,7 +446,7 @@ describe('MasonryMatrix', () => {
 
 			expect(firstWorker.terminate).toHaveBeenCalledOnce();
 
-			const secondPending = matrix.appendItems(secondBatch);
+			const secondPending = matrix.append(secondBatch);
 
 			expect(WorkerMock).toHaveBeenCalledTimes(2);
 
@@ -474,7 +475,7 @@ describe('MasonryMatrix', () => {
 
 			matrix.disableWorker();
 
-			const columns = await matrix.appendItems(batch);
+			const columns = await matrix.append(batch);
 
 			expect(WorkerMock).not.toHaveBeenCalled();
 			expect(appendToMatrixMock).toHaveBeenCalledOnce();
@@ -500,7 +501,7 @@ describe('MasonryMatrix', () => {
 
 			expect(WorkerMock).toHaveBeenCalledOnce();
 
-			const pending = matrix.appendItems(batch);
+			const pending = matrix.append(batch);
 
 			expect(instances[0].postMessage).toHaveBeenCalledOnce();
 			expect(appendToMatrixMock).not.toHaveBeenCalled();
@@ -526,10 +527,11 @@ describe('MasonryMatrix', () => {
 
 			expect(() => matrix.enableWorker()).not.toThrow();
 
-			const columns = await matrix.appendItems(batch);
+			const columns = await matrix.append(batch);
 
 			expect(appendToMatrixMock).toHaveBeenCalledOnce();
 			expect(columns).toBe(updatedState.columns);
+			expect(matrix.getState().workerDisabled).toBe(true);
 		});
 
 		test('does not throw when terminateWorker is called without an active worker', () => {
@@ -542,20 +544,28 @@ describe('MasonryMatrix', () => {
 			expect(() => matrix.terminateWorker()).not.toThrow();
 		});
 
-		test('rejects when Worker emits messageerror', async () => {
+		test('rejects when Worker emits messageerror, disposes the worker, and creates a fresh Worker on the next append', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 480 });
-			const batch = makeSourceItems(2);
+			const recoveredState = makeState({
+				columns: [[makePlacedItem(240)], []],
+				count: 2,
+				rootWidth: 480,
+			});
+
+			const firstBatch = makeSourceItems(2);
+			const secondBatch = makeSourceItems(1);
 
 			createMatrixStateMock.mockReturnValue(initialState);
 
-			const { instances } = installWorkerMock();
+			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(480, 2);
 
-			const pending = matrix.appendItems(batch);
+			const firstPending = matrix.append(firstBatch);
+			const [firstWorker] = instances;
 
-			instances[0].emitMessageError();
+			firstWorker.emitMessageError();
 
-			await expect(pending).rejects.toMatchObject({
+			await expect(firstPending).rejects.toMatchObject({
 				cause: {
 					cause: {
 						message: MASONRY_MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER,
@@ -564,24 +574,45 @@ describe('MasonryMatrix', () => {
 				},
 				message: MASONRY_MATRIX_ERROR_MESSAGES.APPEND_ITEMS,
 			});
+
+			expect(firstWorker.terminate).toHaveBeenCalledOnce();
+
+			const secondPending = matrix.append(secondBatch);
+
+			expect(WorkerMock).toHaveBeenCalledTimes(2);
+
+			const [, secondWorker] = instances;
+			expect(secondWorker).not.toBe(firstWorker);
+
+			secondWorker.emitMessage(recoveredState);
+
+			await expect(secondPending).resolves.toBe(recoveredState.columns);
 		});
 
-		test('propagates Worker runtime errors', async () => {
+		test('propagates Worker runtime errors, disposes the worker, and creates a fresh Worker on the next append', async () => {
 			const errorMessage = faker.string.uuid();
 
 			const initialState = makeState({ count: 1, rootWidth: 320 });
-			const batch = makeSourceItems(2);
+			const recoveredState = makeState({
+				columns: [[makePlacedItem(320)]],
+				count: 1,
+				rootWidth: 320,
+			});
+
+			const firstBatch = makeSourceItems(2);
+			const secondBatch = makeSourceItems(1);
 
 			createMatrixStateMock.mockReturnValue(initialState);
 
-			const { instances } = installWorkerMock();
+			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(320, 1);
 
-			const pending = matrix.appendItems(batch);
+			const firstPending = matrix.append(firstBatch);
+			const [firstWorker] = instances;
 
-			instances[0].emitError(errorMessage);
+			firstWorker.emitError(errorMessage);
 
-			await expect(pending).rejects.toMatchObject({
+			await expect(firstPending).rejects.toMatchObject({
 				cause: {
 					cause: {
 						cause: {
@@ -593,6 +624,19 @@ describe('MasonryMatrix', () => {
 				},
 				message: MASONRY_MATRIX_ERROR_MESSAGES.APPEND_ITEMS,
 			});
+
+			expect(firstWorker.terminate).toHaveBeenCalledOnce();
+
+			const secondPending = matrix.append(secondBatch);
+
+			expect(WorkerMock).toHaveBeenCalledTimes(2);
+
+			const [, secondWorker] = instances;
+			expect(secondWorker).not.toBe(firstWorker);
+
+			secondWorker.emitMessage(recoveredState);
+
+			await expect(secondPending).resolves.toBe(recoveredState.columns);
 		});
 
 		test('rejects when worker.postMessage throws DataCloneError for a non-cloneable payload', async () => {
@@ -613,7 +657,7 @@ describe('MasonryMatrix', () => {
 							name: 'DataCloneError',
 						});
 
-			installWorkerMock<{ callback: () => void }>({
+			const { instances } = installWorkerMock<{ callback: () => void }>({
 				postMessageImpl() {
 					throw dataCloneError;
 				},
@@ -621,20 +665,25 @@ describe('MasonryMatrix', () => {
 
 			const matrix = new MasonryMatrix<{ callback: () => void }>(480, 2);
 
-			const batch = makeSourceItems<{ callback: () => void }>(1, () => ({
-				callback: () => {},
-			}));
+			const nonCloneableBatch = makeSourceItems<{ callback: () => void }>(
+				1,
+				() => ({
+					callback: () => {},
+				}),
+			);
 
-			await expect(matrix.appendItems(batch)).rejects.toMatchObject({
+			await expect(matrix.append(nonCloneableBatch)).rejects.toMatchObject({
 				cause: {
 					cause: dataCloneError,
 					message: MASONRY_MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE,
 				},
 				message: MASONRY_MATRIX_ERROR_MESSAGES.APPEND_ITEMS,
 			});
+
+			expect(instances[0].terminate).toHaveBeenCalledOnce();
 		});
 
-		test('rejects a concurrent appendItems call and does not start a second worker job', async () => {
+		test('rejects a concurrent append call and does not start a second worker job', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 500 });
 			const resolvedState = makeState({
 				columns: [[makePlacedItem(250)], []],
@@ -650,7 +699,7 @@ describe('MasonryMatrix', () => {
 			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(500, 2);
 
-			const firstPending = matrix.appendItems(firstBatch);
+			const firstPending = matrix.append(firstBatch);
 
 			expect(WorkerMock).toHaveBeenCalledOnce();
 
@@ -662,7 +711,7 @@ describe('MasonryMatrix', () => {
 				state: initialState,
 			});
 
-			const secondPending = matrix.appendItems(secondBatch);
+			const secondPending = matrix.append(secondBatch);
 
 			await expect(secondPending).rejects.toMatchObject({
 				message: MASONRY_MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
@@ -676,60 +725,46 @@ describe('MasonryMatrix', () => {
 		});
 	});
 
-	describe('recreateMatrix', () => {
-		test('replays all accumulated raw items in sync mode', async () => {
+	describe('recreate', () => {
+		test('rebuilds the matrix from explicitly provided items in sync mode', async () => {
 			const initialState = makeState({ count: 1, rootWidth: 400 });
-			const stateAfterBatchA = makeState({
-				columns: [[makePlacedItem(400)]],
-				count: 1,
-				rootWidth: 400,
-			});
-			const stateAfterBatchB = makeState({
-				columns: [[makePlacedItem(400), makePlacedItem(400)]],
-				count: 1,
-				rootWidth: 400,
-			});
-
 			const recreatedBaseState = makeState({
 				count: 2,
 				gap: 0,
-				rootWidth: 400,
+				rootWidth: 900,
 			});
 			const recreatedFinalState = makeState({
-				columns: [[makePlacedItem(200)], [makePlacedItem(200)]],
+				columns: [[makePlacedItem(450)], [makePlacedItem(450)]],
 				count: 2,
-				rootWidth: 400,
+				rootWidth: 900,
 			});
 
-			const batchA = makeSourceItems(2);
-			const batchB = makeSourceItems(3);
+			const recreateItems = makeSourceItems(4);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
 				.mockReturnValueOnce(recreatedBaseState);
 
-			appendToMatrixMock
-				.mockReturnValueOnce(stateAfterBatchA)
-				.mockReturnValueOnce(stateAfterBatchB)
-				.mockReturnValueOnce(recreatedFinalState);
+			appendToMatrixMock.mockReturnValueOnce(recreatedFinalState);
 
 			const matrix = new MasonryMatrix(400, 1);
 
-			await matrix.appendItems(batchA);
-			await matrix.appendItems(batchB);
+			const columns = await matrix.recreate({
+				columnCount: 2,
+				items: recreateItems,
+				rootWidth: 900,
+			});
 
-			const columns = await matrix.recreateMatrix(400, 2);
-
-			expect(createMatrixStateMock).toHaveBeenNthCalledWith(2, 400, 2, 0);
-			expect(appendToMatrixMock).toHaveBeenNthCalledWith(
-				3,
+			expect(createMatrixStateMock).toHaveBeenNthCalledWith(2, 900, 2, 0);
+			expect(appendToMatrixMock).toHaveBeenCalledOnce();
+			expect(appendToMatrixMock).toHaveBeenCalledWith(
 				recreatedBaseState,
-				[...batchA, ...batchB],
+				recreateItems,
 			);
 			expect(columns).toBe(recreatedFinalState.columns);
 		});
 
-		test('does not accumulate invalid raw items and replays only accepted items', async () => {
+		test('uses only items passed to recreate and does not replay previously appended batches', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 480 });
 			const stateAfterAppend = makeState({
 				columns: [[makePlacedItem(240)], [makePlacedItem(240)]],
@@ -746,29 +781,8 @@ describe('MasonryMatrix', () => {
 				rootWidth: 900,
 			});
 
-			const validA = {
-				height: 900,
-				id: 'valid-a',
-				width: 1600,
-			} satisfies WithMeta<SourceItem>;
-			const invalidWidth = {
-				height: 900,
-				id: 'invalid-width',
-				width: 0,
-			} satisfies WithMeta<SourceItem>;
-			const invalidHeight = {
-				height: Number.NaN,
-				id: 'invalid-height',
-				width: 1200,
-			} satisfies WithMeta<SourceItem>;
-			const validB = {
-				height: 1200,
-				id: 'valid-b',
-				width: 900,
-			} satisfies WithMeta<SourceItem>;
-
-			const batch = [validA, invalidWidth, invalidHeight, validB];
-			const acceptedItems = [validA, validB];
+			const appendedBatch = makeSourceItems(2);
+			const recreateItems = makeSourceItems(3);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
@@ -780,30 +794,29 @@ describe('MasonryMatrix', () => {
 
 			const matrix = new MasonryMatrix(480, 2);
 
-			await matrix.appendItems(batch);
-			const columns = await matrix.recreateMatrix(900, 3);
+			await matrix.append(appendedBatch);
+
+			const columns = await matrix.recreate({
+				columnCount: 3,
+				items: recreateItems,
+				rootWidth: 900,
+			});
 
 			expect(appendToMatrixMock).toHaveBeenNthCalledWith(
 				1,
 				initialState,
-				acceptedItems,
+				appendedBatch,
 			);
 			expect(appendToMatrixMock).toHaveBeenNthCalledWith(
 				2,
 				recreatedBaseState,
-				acceptedItems,
+				recreateItems,
 			);
 			expect(columns).toBe(recreatedFinalState.columns);
 		});
 
-		test('uses constructor columnCount and gap when recreateMatrix omits them', async () => {
+		test('uses current columnCount and gap when recreate omits them', async () => {
 			const initialState = makeState({ count: 2, gap: 12, rootWidth: 400 });
-			const stateAfterAppend = makeState({
-				columns: [[makePlacedItem(194)], []],
-				count: 2,
-				gap: 12,
-				rootWidth: 400,
-			});
 			const recreatedBaseState = makeState({
 				count: 2,
 				gap: 12,
@@ -816,31 +829,26 @@ describe('MasonryMatrix', () => {
 				rootWidth: 900,
 			});
 
-			const batch = makeSourceItems(2);
+			const recreateItems = makeSourceItems(2);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
 				.mockReturnValueOnce(recreatedBaseState);
 
-			appendToMatrixMock
-				.mockReturnValueOnce(stateAfterAppend)
-				.mockReturnValueOnce(recreatedFinalState);
+			appendToMatrixMock.mockReturnValueOnce(recreatedFinalState);
 
 			const matrix = new MasonryMatrix(400, 2, 12);
 
-			await matrix.appendItems(batch);
-			await matrix.recreateMatrix(900);
+			await matrix.recreate({
+				items: recreateItems,
+				rootWidth: 900,
+			});
 
 			expect(createMatrixStateMock).toHaveBeenNthCalledWith(2, 900, 2, 12);
 		});
 
-		test('remembers new columnCount and gap for subsequent recreateMatrix calls', async () => {
+		test('remembers new columnCount and gap for subsequent recreate calls', async () => {
 			const initialState = makeState({ count: 1, rootWidth: 400 });
-			const stateAfterAppend = makeState({
-				columns: [[makePlacedItem(400)]],
-				count: 1,
-				rootWidth: 400,
-			});
 
 			const recreatedBaseStateA = makeState({
 				count: 3,
@@ -870,7 +878,8 @@ describe('MasonryMatrix', () => {
 				rootWidth: 1200,
 			});
 
-			const batch = makeSourceItems(2);
+			const itemsA = makeSourceItems(2);
+			const itemsB = makeSourceItems(3);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
@@ -878,27 +887,82 @@ describe('MasonryMatrix', () => {
 				.mockReturnValueOnce(recreatedBaseStateB);
 
 			appendToMatrixMock
-				.mockReturnValueOnce(stateAfterAppend)
 				.mockReturnValueOnce(recreatedStateA)
 				.mockReturnValueOnce(recreatedStateB);
 
 			const matrix = new MasonryMatrix(400, 1);
 
-			await matrix.appendItems(batch);
-			await matrix.recreateMatrix(900, 3, 16);
-			await matrix.recreateMatrix(1200);
+			await matrix.recreate({
+				columnCount: 3,
+				gap: 16,
+				items: itemsA,
+				rootWidth: 900,
+			});
+
+			await matrix.recreate({
+				items: itemsB,
+				rootWidth: 1200,
+			});
 
 			expect(createMatrixStateMock).toHaveBeenNthCalledWith(3, 1200, 3, 16);
 		});
 
-		test('uses Worker in recreateMatrix and replays all accumulated raw items after re-enabling worker mode', async () => {
+		test('updates internal state after a successful recreate so subsequent append uses the recreated state', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 400 });
-			const stateAfterFirstAppend = makeState({
-				columns: [[makePlacedItem(200)], []],
-				count: 2,
-				rootWidth: 400,
+			const recreatedBaseState = makeState({
+				count: 3,
+				gap: 8,
+				rootWidth: 900,
+			});
+			const recreatedResolvedState = makeState({
+				columns: [[makePlacedItem(294)], [makePlacedItem(294)], []],
+				count: 3,
+				gap: 8,
+				rootWidth: 900,
+			});
+			const appendResolvedState = makeState({
+				columns: [
+					[makePlacedItem(294), makePlacedItem(294)],
+					[makePlacedItem(294)],
+					[],
+				],
+				count: 3,
+				gap: 8,
+				rootWidth: 900,
 			});
 
+			const recreateItems = makeSourceItems(2);
+			const appendItemsBatch = makeSourceItems(1);
+
+			createMatrixStateMock
+				.mockReturnValueOnce(initialState)
+				.mockReturnValueOnce(recreatedBaseState);
+
+			appendToMatrixMock
+				.mockReturnValueOnce(recreatedResolvedState)
+				.mockReturnValueOnce(appendResolvedState);
+
+			const matrix = new MasonryMatrix(400, 2);
+
+			await matrix.recreate({
+				columnCount: 3,
+				gap: 8,
+				items: recreateItems,
+				rootWidth: 900,
+			});
+
+			const columns = await matrix.append(appendItemsBatch);
+
+			expect(appendToMatrixMock).toHaveBeenNthCalledWith(
+				2,
+				recreatedResolvedState,
+				appendItemsBatch,
+			);
+			expect(columns).toBe(appendResolvedState.columns);
+		});
+
+		test('uses Worker in recreate after enabling worker mode', async () => {
+			const initialState = makeState({ count: 2, rootWidth: 400 });
 			const recreatedBaseState = makeState({ count: 3, rootWidth: 900 });
 			const recreatedFinalState = makeState({
 				columns: [[makePlacedItem(300)], [makePlacedItem(300)], []],
@@ -906,23 +970,23 @@ describe('MasonryMatrix', () => {
 				rootWidth: 900,
 			});
 
-			const batch = makeSourceItems(3);
+			const recreateItems = makeSourceItems(3);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
 				.mockReturnValueOnce(recreatedBaseState);
 
-			appendToMatrixMock.mockReturnValueOnce(stateAfterFirstAppend);
-
 			const matrix = new MasonryMatrix(400, 2);
-
-			await matrix.appendItems(batch);
 
 			const { WorkerMock, instances } = installWorkerMock();
 
 			matrix.enableWorker();
 
-			const pending = matrix.recreateMatrix(900, 3);
+			const pending = matrix.recreate({
+				columnCount: 3,
+				items: recreateItems,
+				rootWidth: 900,
+			});
 
 			expect(WorkerMock).toHaveBeenCalledOnce();
 
@@ -930,7 +994,7 @@ describe('MasonryMatrix', () => {
 
 			expect(worker.postMessage).toHaveBeenCalledOnce();
 			expect(worker.postMessage).toHaveBeenCalledWith({
-				batchItems: batch,
+				batchItems: recreateItems,
 				state: recreatedBaseState,
 			});
 
@@ -939,7 +1003,7 @@ describe('MasonryMatrix', () => {
 			await expect(pending).resolves.toBe(recreatedFinalState.columns);
 		});
 
-		test('reuses existing Worker in recreateMatrix', async () => {
+		test('reuses existing Worker in recreate', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 400 });
 			const stateAfterAppend = makeState({
 				columns: [[makePlacedItem(200)], []],
@@ -961,7 +1025,9 @@ describe('MasonryMatrix', () => {
 				rootWidth: 1200,
 			});
 
-			const batch = makeSourceItems(2);
+			const appendBatch = makeSourceItems(2);
+			const middleItems = makeSourceItems(2);
+			const finalItems = makeSourceItems(2);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
@@ -971,18 +1037,22 @@ describe('MasonryMatrix', () => {
 			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(400, 2);
 
-			const appendPending = matrix.appendItems(batch);
+			const appendPending = matrix.append(appendBatch);
 			const [worker] = instances;
 
 			worker.emitMessage(stateAfterAppend);
 			await expect(appendPending).resolves.toBe(stateAfterAppend.columns);
 
-			const recreateMiddlePending = matrix.recreateMatrix(600, 2);
+			const recreateMiddlePending = matrix.recreate({
+				columnCount: 2,
+				items: middleItems,
+				rootWidth: 600,
+			});
 
 			expect(WorkerMock).toHaveBeenCalledTimes(1);
 			expect(createMatrixStateMock).toHaveBeenNthCalledWith(2, 600, 2, 0);
 			expect(worker.postMessage).toHaveBeenNthCalledWith(2, {
-				batchItems: batch,
+				batchItems: middleItems,
 				state: recreatedMiddleBaseState,
 			});
 
@@ -991,12 +1061,16 @@ describe('MasonryMatrix', () => {
 				recreatedMiddleResolvedState.columns,
 			);
 
-			const recreateFinalPending = matrix.recreateMatrix(1200, 2);
+			const recreateFinalPending = matrix.recreate({
+				columnCount: 2,
+				items: finalItems,
+				rootWidth: 1200,
+			});
 
 			expect(WorkerMock).toHaveBeenCalledTimes(1);
 			expect(createMatrixStateMock).toHaveBeenNthCalledWith(3, 1200, 2, 0);
 			expect(worker.postMessage).toHaveBeenNthCalledWith(3, {
-				batchItems: batch,
+				batchItems: finalItems,
 				state: recreatedFinalBaseState,
 			});
 
@@ -1006,7 +1080,7 @@ describe('MasonryMatrix', () => {
 			);
 		});
 
-		test('rejects a concurrent recreateMatrix call and does not start a new job', async () => {
+		test('rejects a concurrent recreate call and does not start a new job', async () => {
 			const initialState = makeState({ count: 2, rootWidth: 600 });
 			const resolvedState = makeState({
 				columns: [[makePlacedItem(300)], []],
@@ -1014,14 +1088,19 @@ describe('MasonryMatrix', () => {
 				rootWidth: 600,
 			});
 
-			const batch = makeSourceItems(2);
+			const firstItems = makeSourceItems(2);
+			const secondItems = makeSourceItems(3);
 
 			createMatrixStateMock.mockReturnValue(initialState);
 
 			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(600, 2);
 
-			const appendPending = matrix.appendItems(batch);
+			const firstPending = matrix.recreate({
+				columnCount: 3,
+				items: firstItems,
+				rootWidth: 900,
+			});
 
 			expect(WorkerMock).toHaveBeenCalledOnce();
 
@@ -1029,53 +1108,106 @@ describe('MasonryMatrix', () => {
 
 			expect(worker.postMessage).toHaveBeenCalledOnce();
 			expect(worker.postMessage).toHaveBeenCalledWith({
-				batchItems: batch,
+				batchItems: firstItems,
 				state: initialState,
 			});
 
-			const recreatePending = matrix.recreateMatrix(900, 3);
+			const secondPending = matrix.recreate({
+				columnCount: 4,
+				items: secondItems,
+				rootWidth: 1200,
+			});
 
-			await expect(recreatePending).rejects.toMatchObject({
+			await expect(secondPending).rejects.toMatchObject({
 				message: MASONRY_MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
 			});
 
-			expect(createMatrixStateMock).toHaveBeenCalledTimes(1);
 			expect(worker.postMessage).toHaveBeenCalledTimes(1);
 
 			worker.emitMessage(resolvedState);
 
-			await expect(appendPending).resolves.toBe(resolvedState.columns);
+			await expect(firstPending).resolves.toBe(resolvedState.columns);
 		});
 
-		test('wraps recreateMatrix update errors with RECREATE_MATRIX', async () => {
-			const initialState = makeState({ count: 2, rootWidth: 400 });
-			const stateAfterAppend = makeState({
-				columns: [[makePlacedItem(200)], []],
+		test('rejects append while recreate is in flight and does not start a second job', async () => {
+			const initialState = makeState({ count: 2, rootWidth: 600 });
+			const resolvedState = makeState({
+				columns: [[makePlacedItem(300)], []],
 				count: 2,
-				rootWidth: 400,
+				rootWidth: 600,
 			});
-			const recreatedBaseState = makeState({ count: 3, rootWidth: 900 });
-			const batch = makeSourceItems(2);
+
+			const recreateItems = makeSourceItems(2);
+			const appendBatch = makeSourceItems(3);
+
+			createMatrixStateMock.mockReturnValue(initialState);
+
+			const { WorkerMock, instances } = installWorkerMock();
+			const matrix = new MasonryMatrix(600, 2);
+
+			const recreatePending = matrix.recreate({
+				columnCount: 3,
+				items: recreateItems,
+				rootWidth: 900,
+			});
+
+			expect(WorkerMock).toHaveBeenCalledOnce();
+
+			const [worker] = instances;
+
+			expect(worker.postMessage).toHaveBeenCalledOnce();
+			expect(worker.postMessage).toHaveBeenCalledWith({
+				batchItems: recreateItems,
+				state: initialState,
+			});
+
+			const appendPending = matrix.append(appendBatch);
+
+			await expect(appendPending).rejects.toMatchObject({
+				message: MASONRY_MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
+			});
+
+			expect(worker.postMessage).toHaveBeenCalledTimes(1);
+
+			worker.emitMessage(resolvedState);
+
+			await expect(recreatePending).resolves.toBe(resolvedState.columns);
+		});
+
+		test('wraps recreate update errors with RECREATE_MATRIX, disposes the worker, and creates a fresh worker on the next recreate', async () => {
+			const initialState = makeState({ count: 2, rootWidth: 400 });
+			const recreatedBaseStateA = makeState({ count: 3, rootWidth: 900 });
+			const recreatedBaseStateB = makeState({ count: 2, rootWidth: 1200 });
+			const recreatedResolvedStateB = makeState({
+				columns: [[makePlacedItem(600)], [makePlacedItem(600)]],
+				count: 2,
+				rootWidth: 1200,
+			});
+
+			const itemsA = makeSourceItems(2);
+			const itemsB = makeSourceItems(3);
 
 			createMatrixStateMock
 				.mockReturnValueOnce(initialState)
-				.mockReturnValueOnce(recreatedBaseState);
+				.mockReturnValueOnce(recreatedBaseStateA)
+				.mockReturnValueOnce(recreatedBaseStateB);
 
-			appendToMatrixMock.mockReturnValueOnce(stateAfterAppend);
-
+			const { WorkerMock, instances } = installWorkerMock();
 			const matrix = new MasonryMatrix(400, 2);
-
-			await matrix.appendItems(batch);
-
-			const { instances } = installWorkerMock();
 
 			matrix.enableWorker();
 
-			const pending = matrix.recreateMatrix(900, 3);
+			const firstPending = matrix.recreate({
+				columnCount: 3,
+				items: itemsA,
+				rootWidth: 900,
+			});
 
-			instances[0].emitMessageError();
+			const [firstWorker] = instances;
 
-			await expect(pending).rejects.toMatchObject({
+			firstWorker.emitMessageError();
+
+			await expect(firstPending).rejects.toMatchObject({
 				cause: {
 					cause: {
 						message: MASONRY_MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER,
@@ -1084,6 +1216,25 @@ describe('MasonryMatrix', () => {
 				},
 				message: MASONRY_MATRIX_ERROR_MESSAGES.RECREATE_MATRIX,
 			});
+
+			expect(firstWorker.terminate).toHaveBeenCalledOnce();
+
+			const secondPending = matrix.recreate({
+				columnCount: 2,
+				items: itemsB,
+				rootWidth: 1200,
+			});
+
+			expect(WorkerMock).toHaveBeenCalledTimes(2);
+
+			const [, secondWorker] = instances;
+			expect(secondWorker).not.toBe(firstWorker);
+
+			secondWorker.emitMessage(recreatedResolvedStateB);
+
+			await expect(secondPending).resolves.toBe(
+				recreatedResolvedStateB.columns,
+			);
 		});
 	});
 });

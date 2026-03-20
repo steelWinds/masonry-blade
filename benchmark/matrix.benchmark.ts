@@ -10,7 +10,7 @@ import { MasonryMatrix } from '../build/index.js';
 type MetaObjectItem = any;
 
 type Mode = 'plain' | 'meta-object';
-type Operation = 'appendItems' | 'recreateMatrix';
+type Operation = 'append' | 'recreate';
 
 type Scenario = {
 	operation: Operation;
@@ -256,7 +256,7 @@ async function preloadMatrix(
 	baseItems: number,
 ): Promise<MasonryMatrix<any>> {
 	const matrix = createMatrix(columns);
-	await matrix.appendItems(buildItems(mode, baseItems));
+	await matrix.append(buildItems(mode, baseItems));
 	return matrix;
 }
 
@@ -273,13 +273,13 @@ async function runScenario(
 	);
 
 	for (let i = 0; i < options.warmup; i++) {
-		if (scenario.operation === 'appendItems') {
+		if (scenario.operation === 'append') {
 			const matrix = await preloadMatrix(
 				scenario.mode,
 				scenario.columns,
 				scenario.baseItems,
 			);
-			const result = await matrix.appendItems(delta);
+			const result = await matrix.append(delta);
 			assertColumns(
 				scenario.mode,
 				result as any,
@@ -291,7 +291,7 @@ async function runScenario(
 				scenario.columns,
 				scenario.baseItems,
 			);
-			const result = await matrix.recreateMatrix(
+			const result = await matrix.recreate(
 				ROOT_WIDTH + scenario.columns,
 				scenario.columns,
 				GAP,
@@ -303,13 +303,13 @@ async function runScenario(
 	for (let i = 0; i < options.samples; i++) {
 		await maybeGc();
 
-		if (scenario.operation === 'appendItems') {
+		if (scenario.operation === 'append') {
 			const matrix = await preloadMatrix(
 				scenario.mode,
 				scenario.columns,
 				scenario.baseItems,
 			);
-			const { ms, result } = await measure(() => matrix.appendItems(delta));
+			const { ms, result } = await measure(() => matrix.append(delta));
 
 			assertColumns(
 				scenario.mode,
@@ -325,11 +325,7 @@ async function runScenario(
 				scenario.baseItems,
 			);
 			const { ms, result } = await measure(() =>
-				matrix.recreateMatrix(
-					ROOT_WIDTH + scenario.columns,
-					scenario.columns,
-					GAP,
-				),
+				matrix.recreate(ROOT_WIDTH + scenario.columns, scenario.columns, GAP),
 			);
 
 			assertColumns(scenario.mode, result as any, scenario.baseItems);
@@ -364,7 +360,7 @@ function buildScenarios(): Scenario[] {
 		for (const columns of COLUMNS) {
 			for (const baseItems of RECREATE_COUNTS) {
 				scenarios.push({
-					operation: 'recreateMatrix',
+					operation: 'recreate',
 					mode,
 					columns,
 					baseItems,
@@ -375,7 +371,7 @@ function buildScenarios(): Scenario[] {
 
 			for (const addedItems of APPEND_ADDS) {
 				scenarios.push({
-					operation: 'appendItems',
+					operation: 'append',
 					mode,
 					columns,
 					baseItems: APPEND_BASE,
@@ -432,14 +428,11 @@ function buildHighlights(rows: readonly BenchmarkRow[]): string[] {
 	const lines: string[] = [];
 	const recreate1M = rows
 		.filter(
-			(row) =>
-				row.operation === 'recreateMatrix' && row.baseItems === 1_000_000,
+			(row) => row.operation === 'recreate' && row.baseItems === 1_000_000,
 		)
 		.sort((a, b) => a.medianMs - b.medianMs);
 	const append10k = rows
-		.filter(
-			(row) => row.operation === 'appendItems' && row.addedItems === 10_000,
-		)
+		.filter((row) => row.operation === 'append' && row.addedItems === 10_000)
 		.sort((a, b) => a.medianMs - b.medianMs);
 
 	if (recreate1M[0]) {
@@ -456,14 +449,14 @@ function buildHighlights(rows: readonly BenchmarkRow[]): string[] {
 
 	const plain1M = rows.find(
 		(row) =>
-			row.operation === 'recreateMatrix' &&
+			row.operation === 'recreate' &&
 			row.mode === 'plain' &&
 			row.columns === 8 &&
 			row.baseItems === 1_000_000,
 	);
 	const meta1M = rows.find(
 		(row) =>
-			row.operation === 'recreateMatrix' &&
+			row.operation === 'recreate' &&
 			row.mode === 'meta-object' &&
 			row.columns === 8 &&
 			row.baseItems === 1_000_000,
@@ -484,7 +477,7 @@ function toHumanTable(rows: readonly BenchmarkRow[]): string {
 	const separator = '|---|---|---:|---|---:|---:|---:|';
 	const body = rows.map((row) => {
 		const workload =
-			row.operation === 'recreateMatrix'
+			row.operation === 'recreate'
 				? `rebuild ${formatInt(row.baseItems)} items`
 				: `append ${formatInt(row.addedItems)} items to ${formatInt(row.baseItems)}`;
 		return `| ${row.operation} | ${row.mode} | ${row.columns} | ${workload} | ${formatShortMs(row.medianMs)} ms | ${formatShortMs(row.p95Ms)} ms | ${formatInt(Math.round(row.itemsPerSec))} items/sec |`;
@@ -523,8 +516,8 @@ function toMarkdown(
 		'',
 		'- `plain` uses items without `meta`.',
 		'- `meta-object` uses the current MasonryMatrix API with an object in `meta`.',
-		'- `recreateMatrix` measures only the rebuild step after the matrix has already been populated.',
-		'- `appendItems` measures only the new batch append step on top of a preloaded matrix.',
+		'- `recreate` measures only the rebuild step after the matrix has already been populated.',
+		'- `append` measures only the new batch append step on top of a preloaded matrix.',
 		'',
 		'## Highlights',
 		'',
@@ -545,7 +538,7 @@ function printReadableSummary(rows: readonly BenchmarkRow[]): void {
 
 	for (const row of rows) {
 		const workload =
-			row.operation === 'recreateMatrix'
+			row.operation === 'recreate'
 				? `rebuild ${formatInt(row.baseItems)} items`
 				: `append ${formatInt(row.addedItems)} items to ${formatInt(row.baseItems)}`;
 		console.log(
@@ -561,7 +554,7 @@ function printCompactTable(rows: readonly BenchmarkRow[]): void {
 			mode: row.mode,
 			columns: row.columns,
 			workload:
-				row.operation === 'recreateMatrix'
+				row.operation === 'recreate'
 					? `rebuild ${formatInt(row.baseItems)}`
 					: `append ${formatInt(row.addedItems)} to ${formatInt(row.baseItems)}`,
 			'   median': formatShortMs(row.medianMs),
@@ -588,11 +581,9 @@ async function writeReport(
 
 async function warmup(): Promise<void> {
 	const matrix = new MasonryMatrix<any>(ROOT_WIDTH, 8, GAP);
-	await matrix.appendItems(
-		buildItems('plain', 10_000, 9_000_000, FAKER_SEED + 1),
-	);
-	await matrix.recreateMatrix(ROOT_WIDTH + 8, 8, GAP);
-	await matrix.appendItems(
+	await matrix.append(buildItems('plain', 10_000, 9_000_000, FAKER_SEED + 1));
+	await matrix.recreate(ROOT_WIDTH + 8, 8, GAP);
+	await matrix.append(
 		buildItems('meta-object', 100, 9_100_000, FAKER_SEED + 2),
 	);
 }
