@@ -8,4 +8,7 @@ export default defineConfig({
 			tests: fileURLToPath(new URL('./tests', import.meta.url)),
 		},
 	},
+	test: {
+		reporters: ['tree'],
+	},
 });

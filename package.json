@@ -1,9 +1,11 @@
 {
 	"name": "masonry-blade",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"private": false,
-	"description": "Algo-oriented library for calculating masonry grids with zero dependencies 🧱 It uses Web Worker-based computation when a worker is available.",
+	"description": "masonry-blade is a small and fast zero-dependencies engine for masonry layout calculation.",
 	"keywords": [
+		"balanced",
+		"balanced-masonry",
 		"engine",
 		"lib",
 		"low-level",
@@ -32,7 +34,6 @@
 	"types": "./build/index.d.ts",
 	"exports": {
 		".": "./build/index.js",
-		"./worker": "./build/worker.js",
 		"./package.json": "./package.json"
 	},
 	"scripts": {
@@ -64,6 +65,7 @@
 		"tsdown": "0.20.3",
 		"tsx": "^4.21.0",
 		"typescript": "~5.9.3",
+		"unplugin-remove": "^1.0.3",
 		"vitest": "^4.1.0"
 	},
 	"overrides": {

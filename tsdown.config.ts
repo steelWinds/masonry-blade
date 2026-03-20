@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsdown';
+import removePlugin from 'unplugin-remove/esbuild';
 
 export default defineConfig({
 	alias: {
@@ -9,18 +10,21 @@ export default defineConfig({
 		profile: 'esm-only',
 	},
 	define: {
-		'import.meta.env.APPEND_TO_MATRIX_WORKER': JSON.stringify('./worker.js'),
+		'import.meta.env.MATRIX_ENGINE_WORKER': JSON.stringify('./worker.js'),
 	},
 	dts: true,
 	entry: {
-		index: 'src/core/MasonryMatrix/index.ts',
-		worker:
-			'src/core/MasonryMatrix/internal/matrixEngine/appendToMatrix.worker.ts',
+		index: './src',
+		worker: './src/services/MatrixEngine',
 	},
-	exports: true,
+	exports: {
+		exclude: ['worker'],
+	},
+	format: ['esm'],
 	ignoreWatch: ['node_modules', 'build', '__tests__'],
 	outDir: './build',
 	platform: 'neutral',
+	plugins: [removePlugin({ consoleType: ['log', 'warn', 'debug', 'info'] })],
 	publint: true,
 	shims: true,
 });
