@@ -1,167 +1,106 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
-import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { mkdir, writeFile } from 'node:fs/promises';
-
 import { faker } from '@faker-js/faker';
 import { FAKER_SEED } from 'tests/constants.ts';
 import { MasonryMatrix } from '../build/index.js';
 
-type ImageItem = {
-	id: string;
-	src: string;
-	width: number;
-	height: number;
-};
+type MetaObjectItem = any;
 
-type Operation = 'recreateMatrix' | 'appendItems';
+type Mode = 'plain' | 'meta-object';
+type Operation = 'appendItems' | 'recreateMatrix';
 
-type BenchmarkRow = {
+type Scenario = {
 	operation: Operation;
+	mode: Mode;
 	columns: number;
 	baseItems: number;
-	deltaItems: number;
+	addedItems: number;
 	timedItems: number;
-	warmupIterations: number;
-	sampleCount: number;
-	minMs: number;
+};
+
+type BenchmarkRow = Scenario & {
+	samples: number;
+	warmup: number;
 	medianMs: number;
 	meanMs: number;
 	p95Ms: number;
-	maxMs: number;
-	stdDevMs: number;
-	medianOpsPerSec: number;
-	medianItemsPerSec: number;
-};
-
-type MachineInfo = {
-	hostname: string;
-	platform: NodeJS.Platform;
-	release: string;
-	arch: string;
-	node: string;
-	v8: string;
-	cpuCount: number;
-	cpuModel: string;
-	totalMemoryBytes: number;
-	totalMemoryGiB: string;
-	freeMemoryBytes: number;
-	freeMemoryGiB: string;
-	rssBytes: number;
-	rssGiB: string;
-	heapUsedBytes: number;
-	heapUsedGiB: string;
-	heapTotalBytes: number;
-	heapTotalGiB: string;
-	loadAverage1m: string;
-	loadAverage5m: string;
-	loadAverage15m: string;
+	itemsPerSec: number;
 };
 
 type CliOptions = {
 	out?: string;
-	recreateSamples: number;
-	appendSamples: number;
-	warmupIterations: number;
+	samples: number;
+	warmup: number;
 };
 
 const ROOT_WIDTH = 3840;
-const RECREATE_COLUMNS = [8, 16, 32] as const;
-const RECREATE_ITEM_COUNTS = [1_000, 100_000, 1_000_000] as const;
-const APPEND_COLUMNS = [8, 16, 32] as const;
-const APPEND_DELTA_COUNTS = [100, 1_000, 10_000] as const;
-const APPEND_BASE_ITEMS = 1_000_000;
+const GAP = 16;
+const DEFAULT_SAMPLES = 5;
+const DEFAULT_WARMUP = 1;
 const DEFAULT_REPORT_NAME = 'benchmark-results.md';
-const DEFAULT_RECREATE_SAMPLES = 7;
-const DEFAULT_APPEND_SAMPLES = 3;
-const DEFAULT_WARMUP_ITERATIONS = 1;
 
-function getMachineInfo(): MachineInfo {
-	const cpus = os.cpus();
-	const cpuModel = cpus[0]?.model ?? 'Unknown';
-	const totalMemoryBytes = os.totalmem();
-	const freeMemoryBytes = os.freemem();
-	const memoryUsage = process.memoryUsage();
-	const [load1, load5, load15] = os.loadavg();
+const MODES = ['plain', 'meta-object'] as const satisfies readonly Mode[];
+const COLUMNS = [8, 16, 32] as const;
+const RECREATE_COUNTS = [100_000, 1_000_000] as const;
+const APPEND_BASE = 1_000_000;
+const APPEND_ADDS = [1_000, 10_000] as const;
 
+const datasetCache = new Map<string, MetaObjectItem[]>();
+
+function getStringArg(name: string): string | undefined {
+	const exactIndex = process.argv.findIndex((arg) => arg === name);
+
+	if (exactIndex !== -1) {
+		return process.argv[exactIndex + 1];
+	}
+
+	const prefix = `${name}=`;
+	const inline = process.argv.find((arg) => arg.startsWith(prefix));
+
+	return inline?.slice(prefix.length);
+}
+
+function getPositiveIntArg(name: string, fallback: number): number {
+	const raw = getStringArg(name);
+
+	if (raw == null) {
+		return fallback;
+	}
+
+	const value = Number.parseInt(raw, 10);
+
+	if (!Number.isFinite(value) || value <= 0) {
+		throw new Error(`Invalid value for ${name}: ${raw}`);
+	}
+
+	return value;
+}
+
+function parseCliOptions(): CliOptions {
 	return {
-		hostname: os.hostname(),
-		platform: process.platform,
-		release: os.release(),
-		arch: process.arch,
-		node: process.version,
-		v8: process.versions.v8,
-		cpuCount: cpus.length,
-		cpuModel,
-		totalMemoryBytes,
-		totalMemoryGiB: formatGiB(totalMemoryBytes),
-		freeMemoryBytes,
-		freeMemoryGiB: formatGiB(freeMemoryBytes),
-		rssBytes: memoryUsage.rss,
-		rssGiB: formatGiB(memoryUsage.rss),
-		heapUsedBytes: memoryUsage.heapUsed,
-		heapUsedGiB: formatGiB(memoryUsage.heapUsed),
-		heapTotalBytes: memoryUsage.heapTotal,
-		heapTotalGiB: formatGiB(memoryUsage.heapTotal),
-		loadAverage1m: load1.toFixed(2),
-		loadAverage5m: load5.toFixed(2),
-		loadAverage15m: load15.toFixed(2),
+		out: getStringArg('--out'),
+		samples: getPositiveIntArg('--samples', DEFAULT_SAMPLES),
+		warmup: getPositiveIntArg('--warmup', DEFAULT_WARMUP),
 	};
 }
 
-function buildImageItems(
-	count: number,
-	startIndex = 0,
-	seed = FAKER_SEED,
-): ImageItem[] {
-	faker.seed(seed);
-
-	const items = new Array<ImageItem>(count);
-
-	for (let i = 0; i < count; i++) {
-		const index = startIndex + i;
-
-		items[i] = {
-			id: `i${index}`,
-			src: `s${index}`,
-			width: faker.number.int({ min: 240, max: 2560 }),
-			height: faker.number.int({ min: 240, max: 2560 }),
-		};
-	}
-
-	return items;
-}
-
-function countPlacedItems(columns: readonly (readonly unknown[])[]): number {
-	let total = 0;
-
-	for (let i = 0; i < columns.length; i++) {
-		total += columns[i].length;
-	}
-
-	return total;
+function formatInt(value: number): string {
+	return value.toLocaleString('en-US');
 }
 
 function formatMs(value: number): string {
+	return `${value.toFixed(3)} ms`;
+}
+
+function formatShortMs(value: number): string {
 	return value.toFixed(3);
 }
 
-function formatOpsPerSec(value: number): string {
-	return Number.isFinite(value) ? value.toFixed(3) : '∞';
-}
-
 function formatItemsPerSec(value: number): string {
-	return Number.isFinite(value) ? formatInteger(Math.round(value)) : '∞';
-}
-
-function formatGiB(bytes: number): string {
-	return (bytes / 1024 / 1024 / 1024).toFixed(2);
-}
-
-function formatInteger(value: number): string {
-	return value.toLocaleString('en-US');
+	return `${formatInt(Math.round(value))} items/sec`;
 }
 
 function percentile(sortedValues: readonly number[], p: number): number {
@@ -188,7 +127,7 @@ function percentile(sortedValues: readonly number[], p: number): number {
 	);
 }
 
-function arithmeticMean(values: readonly number[]): number {
+function mean(values: readonly number[]): number {
 	if (values.length === 0) {
 		return 0;
 	}
@@ -202,68 +141,90 @@ function arithmeticMean(values: readonly number[]): number {
 	return sum / values.length;
 }
 
-function standardDeviation(values: readonly number[], mean: number): number {
-	if (values.length <= 1) {
-		return 0;
+function buildItems(
+	mode: Mode,
+	count: number,
+	startIndex = 0,
+	seed = FAKER_SEED,
+): MetaObjectItem[] {
+	const key = `${mode}:${count}:${startIndex}:${seed}`;
+	const cached = datasetCache.get(key);
+
+	if (cached) {
+		return cached;
 	}
 
-	let varianceSum = 0;
+	faker.seed(seed);
 
-	for (let i = 0; i < values.length; i++) {
-		const delta = values[i] - mean;
-		varianceSum += delta * delta;
+	const items = new Array(count);
+
+	for (let i = 0; i < count; i++) {
+		const index = startIndex + i;
+		const width = faker.number.int({ min: 240, max: 2560 });
+		const height = faker.number.int({ min: 240, max: 2560 });
+
+		if (mode === 'meta-object') {
+			items[i] = {
+				id: `item-${index}`,
+				width,
+				height,
+				meta: {
+					index,
+					src: `image-${index}.jpg`,
+					aspectRatio: width / height,
+					bucket: index % 2 === 0 ? 'even' : 'odd',
+				},
+			};
+		} else {
+			items[i] = {
+				id: `item-${index}`,
+				width,
+				height,
+			};
+		}
 	}
 
-	return Math.sqrt(varianceSum / values.length);
+	datasetCache.set(key, items);
+
+	return items;
 }
 
-function summarizeSamples(params: {
-	operation: Operation;
-	columns: number;
-	baseItems: number;
-	deltaItems: number;
-	timedItems: number;
-	warmupIterations: number;
-	samples: readonly number[];
-}): BenchmarkRow {
-	const {
-		operation,
-		columns,
-		baseItems,
-		deltaItems,
-		timedItems,
-		warmupIterations,
-		samples,
-	} = params;
-	const sortedSamples = [...samples].sort((a, b) => a - b);
-	const minMs = sortedSamples[0] ?? 0;
-	const medianMs = percentile(sortedSamples, 0.5);
-	const meanMs = arithmeticMean(sortedSamples);
-	const p95Ms = percentile(sortedSamples, 0.95);
-	const maxMs = sortedSamples[sortedSamples.length - 1] ?? 0;
-	const stdDevMs = standardDeviation(sortedSamples, meanMs);
-	const medianOpsPerSec =
-		medianMs === 0 ? Number.POSITIVE_INFINITY : 1000 / medianMs;
-	const medianItemsPerSec =
-		medianMs === 0 ? Number.POSITIVE_INFINITY : (timedItems * 1000) / medianMs;
+function countPlaced(columns: readonly (readonly unknown[])[]): number {
+	let total = 0;
 
-	return {
-		operation,
-		columns,
-		baseItems,
-		deltaItems,
-		timedItems,
-		warmupIterations,
-		sampleCount: samples.length,
-		minMs,
-		medianMs,
-		meanMs,
-		p95Ms,
-		maxMs,
-		stdDevMs,
-		medianOpsPerSec,
-		medianItemsPerSec,
-	};
+	for (let i = 0; i < columns.length; i++) {
+		total += columns[i].length;
+	}
+
+	return total;
+}
+
+function assertColumns(
+	mode: Mode,
+	columns: readonly (readonly Record<string, unknown>[])[],
+	expectedItems: number,
+): void {
+	const total = countPlaced(columns);
+
+	if (total !== expectedItems) {
+		throw new Error(`Expected ${expectedItems} placed items, got ${total}`);
+	}
+
+	if (mode !== 'meta-object' || total === 0) {
+		return;
+	}
+
+	for (let i = 0; i < columns.length; i++) {
+		if (columns[i].length > 0) {
+			if (
+				typeof columns[i][0].meta !== 'object' ||
+				columns[i][0].meta == null
+			) {
+				throw new Error('Meta object was not preserved in the result.');
+			}
+			return;
+		}
+	}
 }
 
 async function maybeGc(): Promise<void> {
@@ -275,265 +236,342 @@ async function maybeGc(): Promise<void> {
 	await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
-async function warmup(): Promise<void> {
-	const matrix = new MasonryMatrix(ROOT_WIDTH, 8);
-	const warmupItems = buildImageItems(10_000, 9_000_000, FAKER_SEED + 99);
-
-	await matrix.appendItems(warmupItems);
-	await matrix.recreateMatrix(ROOT_WIDTH, 8);
-	await matrix.appendItems(warmupItems.slice(0, 100));
-}
-
-async function measureOneOperation<T>(
+async function measure<T>(
 	operation: () => Promise<T>,
 ): Promise<{ ms: number; result: T }> {
-	const startedAt = performance.now();
+	const started = performance.now();
 	const result = await operation();
-	const endedAt = performance.now();
+	const ended = performance.now();
+
+	return { ms: ended - started, result };
+}
+
+function createMatrix(columns: number): MasonryMatrix<any> {
+	return new MasonryMatrix<any>(ROOT_WIDTH, columns, GAP);
+}
+
+async function preloadMatrix(
+	mode: Mode,
+	columns: number,
+	baseItems: number,
+): Promise<MasonryMatrix<any>> {
+	const matrix = createMatrix(columns);
+	await matrix.appendItems(buildItems(mode, baseItems));
+	return matrix;
+}
+
+async function runScenario(
+	scenario: Scenario,
+	options: CliOptions,
+): Promise<BenchmarkRow> {
+	const samples: number[] = [];
+	const delta = buildItems(
+		scenario.mode,
+		scenario.addedItems,
+		scenario.baseItems,
+		FAKER_SEED + scenario.columns * 100 + scenario.addedItems,
+	);
+
+	for (let i = 0; i < options.warmup; i++) {
+		if (scenario.operation === 'appendItems') {
+			const matrix = await preloadMatrix(
+				scenario.mode,
+				scenario.columns,
+				scenario.baseItems,
+			);
+			const result = await matrix.appendItems(delta);
+			assertColumns(
+				scenario.mode,
+				result as any,
+				scenario.baseItems + scenario.addedItems,
+			);
+		} else {
+			const matrix = await preloadMatrix(
+				scenario.mode,
+				scenario.columns,
+				scenario.baseItems,
+			);
+			const result = await matrix.recreateMatrix(
+				ROOT_WIDTH + scenario.columns,
+				scenario.columns,
+				GAP,
+			);
+			assertColumns(scenario.mode, result as any, scenario.baseItems);
+		}
+	}
+
+	for (let i = 0; i < options.samples; i++) {
+		await maybeGc();
+
+		if (scenario.operation === 'appendItems') {
+			const matrix = await preloadMatrix(
+				scenario.mode,
+				scenario.columns,
+				scenario.baseItems,
+			);
+			const { ms, result } = await measure(() => matrix.appendItems(delta));
+
+			assertColumns(
+				scenario.mode,
+				result as any,
+				scenario.baseItems + scenario.addedItems,
+			);
+
+			samples.push(ms);
+		} else {
+			const matrix = await preloadMatrix(
+				scenario.mode,
+				scenario.columns,
+				scenario.baseItems,
+			);
+			const { ms, result } = await measure(() =>
+				matrix.recreateMatrix(
+					ROOT_WIDTH + scenario.columns,
+					scenario.columns,
+					GAP,
+				),
+			);
+
+			assertColumns(scenario.mode, result as any, scenario.baseItems);
+
+			samples.push(ms);
+		}
+	}
+
+	const sorted = [...samples].sort((a, b) => a - b);
+	const medianMs = percentile(sorted, 0.5);
+	const meanMs = mean(sorted);
+	const p95Ms = percentile(sorted, 0.95);
 
 	return {
-		ms: endedAt - startedAt,
-		result,
+		...scenario,
+		samples: options.samples,
+		warmup: options.warmup,
+		medianMs,
+		meanMs,
+		p95Ms,
+		itemsPerSec:
+			medianMs === 0
+				? Number.POSITIVE_INFINITY
+				: (scenario.timedItems * 1000) / medianMs,
 	};
 }
 
-async function runRecreateBenchmarks(
-	allItems: readonly ImageItem[],
-	options: CliOptions,
-): Promise<BenchmarkRow[]> {
-	const rows: BenchmarkRow[] = [];
+function buildScenarios(): Scenario[] {
+	const scenarios: Scenario[] = [];
 
-	console.log('\n[recreateMatrix] Preparing scenarios...');
-
-	for (const itemCount of RECREATE_ITEM_COUNTS) {
-		const items =
-			itemCount === allItems.length ? allItems : allItems.slice(0, itemCount);
-
-		for (const columns of RECREATE_COLUMNS) {
-			await maybeGc();
-
-			const matrix = new MasonryMatrix(ROOT_WIDTH, columns);
-			await matrix.appendItems(items);
-
-			for (let i = 0; i < options.warmupIterations; i++) {
-				await matrix.recreateMatrix(ROOT_WIDTH, columns);
+	for (const mode of MODES) {
+		for (const columns of COLUMNS) {
+			for (const baseItems of RECREATE_COUNTS) {
+				scenarios.push({
+					operation: 'recreateMatrix',
+					mode,
+					columns,
+					baseItems,
+					addedItems: 0,
+					timedItems: baseItems,
+				});
 			}
 
-			const samples: number[] = [];
-
-			for (
-				let sampleIndex = 0;
-				sampleIndex < options.recreateSamples;
-				sampleIndex++
-			) {
-				await maybeGc();
-
-				const { ms, result } = await measureOneOperation(() =>
-					matrix.recreateMatrix(ROOT_WIDTH, columns),
-				);
-
-				const placed = countPlacedItems(result);
-
-				if (placed !== itemCount) {
-					throw new Error(
-						`Invalid recreateMatrix result: expected ${itemCount} items, got ${placed}`,
-					);
-				}
-
-				samples.push(ms);
+			for (const addedItems of APPEND_ADDS) {
+				scenarios.push({
+					operation: 'appendItems',
+					mode,
+					columns,
+					baseItems: APPEND_BASE,
+					addedItems,
+					timedItems: addedItems,
+				});
 			}
-
-			const row = summarizeSamples({
-				operation: 'recreateMatrix',
-				columns,
-				baseItems: itemCount,
-				deltaItems: 0,
-				timedItems: itemCount,
-				warmupIterations: options.warmupIterations,
-				samples,
-			});
-
-			rows.push(row);
-
-			console.log(
-				`  done: items=${formatInteger(itemCount)}, columns=${columns}, median=${formatMs(row.medianMs)} ms, p95=${formatMs(row.p95Ms)} ms`,
-			);
 		}
 	}
 
-	return rows;
+	return scenarios;
 }
 
-async function runAppendBenchmarks(
-	baseItems: readonly ImageItem[],
-	options: CliOptions,
-): Promise<BenchmarkRow[]> {
-	const rows: BenchmarkRow[] = [];
+function overheadPercent(base: number, value: number): string {
+	if (base === 0) {
+		return 'n/a';
+	}
+	const delta = ((value - base) / base) * 100;
+	return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
+}
 
-	console.log('\n[appendItems] Preparing scenarios...');
+function buildModeComparison(rows: readonly BenchmarkRow[]): string[] {
+	const plain = new Map<string, BenchmarkRow>();
+	const meta = new Map<string, BenchmarkRow>();
 
-	for (const columns of APPEND_COLUMNS) {
-		for (const delta of APPEND_DELTA_COUNTS) {
-			const extraItems = buildImageItems(
-				delta,
-				APPEND_BASE_ITEMS,
-				FAKER_SEED + columns * 100 + delta,
-			);
-
-			const samples: number[] = [];
-
-			for (
-				let sampleIndex = 0;
-				sampleIndex < options.appendSamples;
-				sampleIndex++
-			) {
-				await maybeGc();
-
-				const matrix = new MasonryMatrix(ROOT_WIDTH, columns);
-				await matrix.appendItems(baseItems);
-
-				for (let i = 0; i < options.warmupIterations; i++) {
-					const warmupMatrix = new MasonryMatrix(ROOT_WIDTH, columns);
-					await warmupMatrix.appendItems(baseItems);
-					await warmupMatrix.appendItems(extraItems);
-				}
-
-				await maybeGc();
-
-				const { ms, result } = await measureOneOperation(() =>
-					matrix.appendItems(extraItems),
-				);
-
-				const expected = APPEND_BASE_ITEMS + delta;
-				const placed = countPlacedItems(result);
-
-				if (placed !== expected) {
-					throw new Error(
-						`Invalid appendItems result: expected ${expected} items, got ${placed}`,
-					);
-				}
-
-				samples.push(ms);
-			}
-
-			const row = summarizeSamples({
-				operation: 'appendItems',
-				columns,
-				baseItems: APPEND_BASE_ITEMS,
-				deltaItems: delta,
-				timedItems: delta,
-				warmupIterations: options.warmupIterations,
-				samples,
-			});
-
-			rows.push(row);
-
-			console.log(
-				`  done: base=${formatInteger(APPEND_BASE_ITEMS)}, add=${formatInteger(delta)}, columns=${columns}, median=${formatMs(row.medianMs)} ms, p95=${formatMs(row.p95Ms)} ms`,
-			);
+	for (const row of rows) {
+		const key = `${row.operation}:${row.columns}:${row.baseItems}:${row.addedItems}`;
+		if (row.mode === 'plain') {
+			plain.set(key, row);
+		} else {
+			meta.set(key, row);
 		}
 	}
 
-	return rows;
+	const lines = [
+		'| Operation | Columns | Base items | Added items | Plain median | Meta median | Meta overhead |',
+		'|---|---:|---:|---:|---:|---:|---:|',
+	];
+
+	for (const [key, plainRow] of plain.entries()) {
+		const metaRow = meta.get(key);
+		if (!metaRow) {
+			continue;
+		}
+		lines.push(
+			`| ${plainRow.operation} | ${plainRow.columns} | ${formatInt(plainRow.baseItems)} | ${formatInt(plainRow.addedItems)} | ${formatShortMs(plainRow.medianMs)} ms | ${formatShortMs(metaRow.medianMs)} ms | ${overheadPercent(plainRow.medianMs, metaRow.medianMs)} |`,
+		);
+	}
+
+	return lines;
 }
 
-function toMarkdownTable(rows: readonly BenchmarkRow[]): string {
+function buildHighlights(rows: readonly BenchmarkRow[]): string[] {
+	const lines: string[] = [];
+	const recreate1M = rows
+		.filter(
+			(row) =>
+				row.operation === 'recreateMatrix' && row.baseItems === 1_000_000,
+		)
+		.sort((a, b) => a.medianMs - b.medianMs);
+	const append10k = rows
+		.filter(
+			(row) => row.operation === 'appendItems' && row.addedItems === 10_000,
+		)
+		.sort((a, b) => a.medianMs - b.medianMs);
+
+	if (recreate1M[0]) {
+		lines.push(
+			`- Fastest rebuild of 1,000,000 items: **${recreate1M[0].mode}**, ${recreate1M[0].columns} columns, **${formatMs(recreate1M[0].medianMs)}** median, ${formatItemsPerSec(recreate1M[0].itemsPerSec)}.`,
+		);
+	}
+
+	if (append10k[0]) {
+		lines.push(
+			`- Fastest append of 10,000 items onto a 1,000,000-item matrix: **${append10k[0].mode}**, ${append10k[0].columns} columns, **${formatMs(append10k[0].medianMs)}** median, ${formatItemsPerSec(append10k[0].itemsPerSec)}.`,
+		);
+	}
+
+	const plain1M = rows.find(
+		(row) =>
+			row.operation === 'recreateMatrix' &&
+			row.mode === 'plain' &&
+			row.columns === 8 &&
+			row.baseItems === 1_000_000,
+	);
+	const meta1M = rows.find(
+		(row) =>
+			row.operation === 'recreateMatrix' &&
+			row.mode === 'meta-object' &&
+			row.columns === 8 &&
+			row.baseItems === 1_000_000,
+	);
+
+	if (plain1M && meta1M) {
+		lines.push(
+			`- At 8 columns and 1,000,000 items, adding a meta object changes rebuild median from **${formatMs(plain1M.medianMs)}** to **${formatMs(meta1M.medianMs)}** (${overheadPercent(plain1M.medianMs, meta1M.medianMs)}).`,
+		);
+	}
+
+	return lines;
+}
+
+function toHumanTable(rows: readonly BenchmarkRow[]): string {
 	const header =
-		'| Operation | Columns | Base items | Added items | Timed items | Samples | Warmup | Min ms | Median ms | Mean ms | P95 ms | Max ms | StdDev ms | Median ops/sec | Median items/sec |';
-	const separator =
-		'|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|';
+		'| Operation | Mode | Columns | Workload | Median | P95 | Throughput |';
+	const separator = '|---|---|---:|---|---:|---:|---:|';
 	const body = rows.map((row) => {
-		return `| ${row.operation} | ${row.columns} | ${formatInteger(row.baseItems)} | ${formatInteger(row.deltaItems)} | ${formatInteger(row.timedItems)} | ${row.sampleCount} | ${row.warmupIterations} | ${formatMs(row.minMs)} | ${formatMs(row.medianMs)} | ${formatMs(row.meanMs)} | ${formatMs(row.p95Ms)} | ${formatMs(row.maxMs)} | ${formatMs(row.stdDevMs)} | ${formatOpsPerSec(row.medianOpsPerSec)} | ${formatItemsPerSec(row.medianItemsPerSec)} |`;
+		const workload =
+			row.operation === 'recreateMatrix'
+				? `rebuild ${formatInt(row.baseItems)} items`
+				: `append ${formatInt(row.addedItems)} items to ${formatInt(row.baseItems)}`;
+		return `| ${row.operation} | ${row.mode} | ${row.columns} | ${workload} | ${formatShortMs(row.medianMs)} ms | ${formatShortMs(row.p95Ms)} ms | ${formatInt(Math.round(row.itemsPerSec))} items/sec |`;
 	});
 
 	return [header, separator, ...body].join('\n');
 }
 
-function buildMarkdownReport(params: {
-	startedAt: Date;
-	finishedAt: Date;
-	machineAtStart: MachineInfo;
-	machineAtEnd: MachineInfo;
-	options: CliOptions;
-	recreateRows: readonly BenchmarkRow[];
-	appendRows: readonly BenchmarkRow[];
-}): string {
-	const {
-		startedAt,
-		finishedAt,
-		machineAtStart,
-		machineAtEnd,
-		options,
-		recreateRows,
-		appendRows,
-	} = params;
-	const durationMs = finishedAt.getTime() - startedAt.getTime();
+function toMarkdown(
+	rows: readonly BenchmarkRow[],
+	options: CliOptions,
+): string {
+	const sorted = [...rows].sort((a, b) => {
+		if (a.operation !== b.operation)
+			return a.operation.localeCompare(b.operation);
+		if (a.mode !== b.mode) return a.mode.localeCompare(b.mode);
+		if (a.columns !== b.columns) return a.columns - b.columns;
+		if (a.baseItems !== b.baseItems) return a.baseItems - b.baseItems;
+		return a.addedItems - b.addedItems;
+	});
 
 	return [
-		'# MasonryMatrix Benchmark Report',
+		'# MasonryMatrix Benchmark',
 		'',
-		`- Benchmark date (start): ${startedAt.toISOString()}`,
-		`- Benchmark date (end): ${finishedAt.toISOString()}`,
-		`- Total wall-clock duration: ${formatInteger(durationMs)} ms`,
-		`- Node.js: ${machineAtStart.node}`,
-		`- V8: ${machineAtStart.v8}`,
+		'## Setup',
+		'',
 		`- Seed: ${FAKER_SEED}`,
 		`- Root width: ${ROOT_WIDTH}`,
-		`- GC exposed: yes`,
+		`- Gap: ${GAP}`,
+		`- Samples per scenario: ${options.samples}`,
+		`- Warmup iterations per scenario: ${options.warmup}`,
+		`- GC exposed: ${typeof globalThis.gc === 'function' ? 'yes' : 'no'}`,
+		`- Modes: ${MODES.join(', ')}`,
 		'',
-		'## Benchmark configuration',
+		'## How to read it',
 		'',
-		`- recreateMatrix samples per scenario: ${options.recreateSamples}`,
-		`- appendItems samples per scenario: ${options.appendSamples}`,
-		`- Warmup iterations per scenario: ${options.warmupIterations}`,
-		`- recreateMatrix columns: ${RECREATE_COLUMNS.join(', ')}`,
-		`- recreateMatrix item counts: ${RECREATE_ITEM_COUNTS.map(formatInteger).join(', ')}`,
-		`- appendItems columns: ${APPEND_COLUMNS.join(', ')}`,
-		`- appendItems base items: ${formatInteger(APPEND_BASE_ITEMS)}`,
-		`- appendItems delta counts: ${APPEND_DELTA_COUNTS.map(formatInteger).join(', ')}`,
+		'- `plain` uses items without `meta`.',
+		'- `meta-object` uses the current MasonryMatrix API with an object in `meta`.',
+		'- `recreateMatrix` measures only the rebuild step after the matrix has already been populated.',
+		'- `appendItems` measures only the new batch append step on top of a preloaded matrix.',
 		'',
-		'## Machine at start',
+		'## Highlights',
 		'',
-		`- Hostname: ${machineAtStart.hostname}`,
-		`- Platform: ${machineAtStart.platform}`,
-		`- Release: ${machineAtStart.release}`,
-		`- Architecture: ${machineAtStart.arch}`,
-		`- CPU count: ${machineAtStart.cpuCount}`,
-		`- CPU model: ${machineAtStart.cpuModel}`,
-		`- Load average (1m, 5m, 15m): ${machineAtStart.loadAverage1m}, ${machineAtStart.loadAverage5m}, ${machineAtStart.loadAverage15m}`,
-		`- Total memory: ${machineAtStart.totalMemoryGiB} GiB (${formatInteger(machineAtStart.totalMemoryBytes)} bytes)`,
-		`- Free memory: ${machineAtStart.freeMemoryGiB} GiB (${formatInteger(machineAtStart.freeMemoryBytes)} bytes)`,
-		`- RSS: ${machineAtStart.rssGiB} GiB (${formatInteger(machineAtStart.rssBytes)} bytes)`,
-		`- Heap used: ${machineAtStart.heapUsedGiB} GiB (${formatInteger(machineAtStart.heapUsedBytes)} bytes)`,
-		`- Heap total: ${machineAtStart.heapTotalGiB} GiB (${formatInteger(machineAtStart.heapTotalBytes)} bytes)`,
+		...buildHighlights(sorted),
 		'',
-		'## Machine at end',
+		'## Results',
 		'',
-		`- Free memory: ${machineAtEnd.freeMemoryGiB} GiB (${formatInteger(machineAtEnd.freeMemoryBytes)} bytes)`,
-		`- RSS: ${machineAtEnd.rssGiB} GiB (${formatInteger(machineAtEnd.rssBytes)} bytes)`,
-		`- Heap used: ${machineAtEnd.heapUsedGiB} GiB (${formatInteger(machineAtEnd.heapUsedBytes)} bytes)`,
-		`- Heap total: ${machineAtEnd.heapTotalGiB} GiB (${formatInteger(machineAtEnd.heapTotalBytes)} bytes)`,
+		toHumanTable(sorted),
 		'',
-		'## Scenario notes',
+		'## Plain vs meta-object overhead',
 		'',
-		'- Timed sections exclude synthetic data generation.',
-		'- recreateMatrix measurements exclude base dataset generation and the initial matrix fill.',
-		'- appendItems measurements exclude synthetic delta dataset generation and the preload of 1,000,000 items.',
-		'- recreateMatrix samples reuse the same prepared matrix for repeated rebuilds.',
-		'- appendItems samples prepare a fresh preloaded matrix per sample to keep the starting state stable.',
-		'',
-		'## recreateMatrix',
-		'',
-		toMarkdownTable(recreateRows),
-		'',
-		'## appendItems',
-		'',
-		toMarkdownTable(appendRows),
-		'',
+		...buildModeComparison(sorted),
 	].join('\n');
 }
 
-async function writeMarkdownReport(
+function printReadableSummary(rows: readonly BenchmarkRow[]): void {
+	console.log('\nReadable summary\n');
+
+	for (const row of rows) {
+		const workload =
+			row.operation === 'recreateMatrix'
+				? `rebuild ${formatInt(row.baseItems)} items`
+				: `append ${formatInt(row.addedItems)} items to ${formatInt(row.baseItems)}`;
+		console.log(
+			`- ${row.operation} | ${row.mode} | ${row.columns} cols | ${workload} -> median ${formatMs(row.medianMs)}, p95 ${formatMs(row.p95Ms)}, ${formatItemsPerSec(row.itemsPerSec)}`,
+		);
+	}
+}
+
+function printCompactTable(rows: readonly BenchmarkRow[]): void {
+	console.table(
+		rows.map((row) => ({
+			operation: row.operation,
+			mode: row.mode,
+			columns: row.columns,
+			workload:
+				row.operation === 'recreateMatrix'
+					? `rebuild ${formatInt(row.baseItems)}`
+					: `append ${formatInt(row.addedItems)} to ${formatInt(row.baseItems)}`,
+			'   median': formatShortMs(row.medianMs),
+			'      p95': formatShortMs(row.p95Ms),
+			throughput: formatInt(Math.round(row.itemsPerSec)),
+		})),
+	);
+}
+
+async function writeReport(
 	markdown: string,
 	explicitOutputPath?: string,
 ): Promise<string> {
@@ -548,114 +586,53 @@ async function writeMarkdownReport(
 	return outputPath;
 }
 
-function getStringArg(name: string): string | undefined {
-	const exactIndex = process.argv.findIndex((arg) => arg === name);
-
-	if (exactIndex !== -1) {
-		return process.argv[exactIndex + 1];
-	}
-
-	const inlinePrefix = `${name}=`;
-	const inlineArg = process.argv.find((arg) => arg.startsWith(inlinePrefix));
-
-	return inlineArg?.slice(inlinePrefix.length);
-}
-
-function getPositiveIntArg(name: string, fallback: number): number {
-	const raw = getStringArg(name);
-
-	if (raw == null) {
-		return fallback;
-	}
-
-	const value = Number.parseInt(raw, 10);
-
-	if (!Number.isFinite(value) || value <= 0) {
-		throw new Error(`Invalid value for ${name}: ${raw}`);
-	}
-
-	return value;
-}
-
-function parseCliOptions(): CliOptions {
-	return {
-		out: getStringArg('--out'),
-		recreateSamples: getPositiveIntArg(
-			'--recreate-samples',
-			DEFAULT_RECREATE_SAMPLES,
-		),
-		appendSamples: getPositiveIntArg(
-			'--append-samples',
-			DEFAULT_APPEND_SAMPLES,
-		),
-		warmupIterations: getPositiveIntArg('--warmup', DEFAULT_WARMUP_ITERATIONS),
-	};
-}
-
-function printConsoleSummary(rows: readonly BenchmarkRow[]): void {
-	console.log('\n=== Summary ===\n');
-	console.table(
-		rows.map((row) => ({
-			operation: row.operation,
-			columns: row.columns,
-			baseItems: formatInteger(row.baseItems),
-			addedItems: formatInteger(row.deltaItems),
-			timedItems: formatInteger(row.timedItems),
-			samples: row.sampleCount,
-			warmup: row.warmupIterations,
-			'median ms': formatMs(row.medianMs),
-			'p95 ms': formatMs(row.p95Ms),
-			'median ops/sec': formatOpsPerSec(row.medianOpsPerSec),
-			'median items/sec': formatItemsPerSec(row.medianItemsPerSec),
-		})),
+async function warmup(): Promise<void> {
+	const matrix = new MasonryMatrix<any>(ROOT_WIDTH, 8, GAP);
+	await matrix.appendItems(
+		buildItems('plain', 10_000, 9_000_000, FAKER_SEED + 1),
+	);
+	await matrix.recreateMatrix(ROOT_WIDTH + 8, 8, GAP);
+	await matrix.appendItems(
+		buildItems('meta-object', 100, 9_100_000, FAKER_SEED + 2),
 	);
 }
 
 async function main(): Promise<void> {
-	const startedAt = new Date();
-	const machineAtStart = getMachineInfo();
 	const options = parseCliOptions();
+	const scenarios = buildScenarios();
+	const rows: BenchmarkRow[] = [];
 
 	console.log('MasonryMatrix benchmark');
 	console.log(`Node.js ${process.version}`);
 	console.log(`Seed: ${FAKER_SEED}`);
-	console.log(`Root width: ${ROOT_WIDTH}`);
-	console.log(`recreate samples: ${options.recreateSamples}`);
-	console.log(`append samples: ${options.appendSamples}`);
-	console.log(`warmup iterations per scenario: ${options.warmupIterations}`);
+	console.log(`Scenarios: ${scenarios.length}`);
+	console.log(`Samples per scenario: ${options.samples}`);
+	console.log(`Warmup iterations per scenario: ${options.warmup}`);
 
 	if (typeof globalThis.gc !== 'function') {
-		console.warn(
-			'[warning] Run with --expose-gc to reduce variance between scenarios.',
+		console.warn('[warning] Run with --expose-gc to reduce variance.');
+	}
+
+	await warmup();
+
+	for (const scenario of scenarios) {
+		console.log(
+			`[${scenario.operation}] ${scenario.mode}, ${scenario.columns} cols, base=${formatInt(scenario.baseItems)}, add=${formatInt(scenario.addedItems)}`,
+		);
+
+		const row = await runScenario(scenario, options);
+		rows.push(row);
+
+		console.log(
+			`  -> median ${formatMs(row.medianMs)}, p95 ${formatMs(row.p95Ms)}, ${formatItemsPerSec(row.itemsPerSec)}`,
 		);
 	}
 
-	console.log(
-		`\nGenerating base dataset with ${formatInteger(APPEND_BASE_ITEMS)} items...`,
-	);
-	const allItems = buildImageItems(APPEND_BASE_ITEMS, 0, FAKER_SEED);
+	printReadableSummary(rows);
+	printCompactTable(rows);
 
-	console.log('Running global warmup...');
-	await warmup();
-
-	const recreateRows = await runRecreateBenchmarks(allItems, options);
-	const appendRows = await runAppendBenchmarks(allItems, options);
-	const allRows = [...recreateRows, ...appendRows];
-
-	printConsoleSummary(allRows);
-
-	const finishedAt = new Date();
-	const machineAtEnd = getMachineInfo();
-	const markdown = buildMarkdownReport({
-		startedAt,
-		finishedAt,
-		machineAtStart,
-		machineAtEnd,
-		options,
-		recreateRows,
-		appendRows,
-	});
-	const reportPath = await writeMarkdownReport(markdown, options.out);
+	const markdown = toMarkdown(rows, options);
+	const reportPath = await writeReport(markdown, options.out);
 
 	console.log(`\nMarkdown report written to: ${reportPath}`);
 }

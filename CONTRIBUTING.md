@@ -2,17 +2,17 @@
 
 Thanks for your interest in contributing to `masonry-blade`.
 
-`masonry-blade` is a low-level masonry layout engine with a small API surface, predictable behavior, and zero runtime dependencies. Contributions are welcome, but changes should stay focused and justified.
+`masonry-blade` is a deliberately small, low-level masonry layout engine. The project values a narrow API surface, predictable behavior, deterministic layout output, and clear worker fallback semantics. Contributions are welcome, but they should stay focused and justified.
 
-## Before you open an issue or PR
+## Before opening an issue or pull request
 
 Please check:
 
-- existing issues and pull requests
-- the current README and public API behavior
-- whether the change is a bug fix, test improvement, docs improvement, or a narrowly scoped feature
+- Existing issues and pull requests
+- The current README and public API behavior
+- Whether your change is a bug fix, a test improvement, a documentation improvement, or a narrowly scoped feature
 
-For security issues, do not open a public issue. See `SECURITY.md`.
+For security issues, please do not open a public issue. See `SECURITY.md`.
 
 ## Development setup
 
@@ -29,7 +29,7 @@ cd masonry-blade
 pnpm install
 ```
 
-## Available commands
+## Day-to-day commands
 
 ```bash
 pnpm build
@@ -43,18 +43,10 @@ pnpm fmt:check
 pnpm benchmark
 ```
 
-## What makes a good contribution
+Notes:
 
-Good contributions usually include:
-
-- bug fixes
-- tests for edge cases and regressions
-- documentation improvements
-- type-level improvements
-- performance improvements backed by evidence
-- small API improvements that keep the library simple
-
-Please avoid unrelated changes in the same pull request.
+- `pnpm test` is useful during development if you want the default interactive test workflow.
+- `pnpm test:run` is the non-interactive test command used for validation and CI-style checks.
 
 ## Project boundaries
 
@@ -62,17 +54,33 @@ This library is intentionally narrow.
 
 It is:
 
-- a masonry layout engine
-- framework-agnostic
-- focused on image-based masonry input
+- A masonry layout engine
+- Framework-agnostic
+- Focused on source sizes, coordinates, and replayable layout state
+- Designed around a single public runtime facade: `MasonryMatrix`
 
 It is not:
 
-- a UI component
-- a DOM renderer
-- a framework integration layer
+- A UI component
+- A DOM renderer
+- A framework integration layer
+- An image loader
+- A virtualization library
 
-If you want to propose a broader feature, open an issue first and explain the use case.
+If you want to propose a broader feature, please open an issue first and explain the use case.
+
+## What makes a good contribution
+
+Good contributions usually include:
+
+- Bug fixes
+- Tests for regressions and edge cases
+- Documentation improvements
+- Type-level improvements
+- Performance improvements backed by measurements
+- Small API improvements that keep the library simple
+
+Please avoid unrelated changes in the same pull request.
 
 ## Contribution guidelines
 
@@ -82,10 +90,11 @@ Prefer changes that solve one problem well.
 
 Avoid changes that:
 
-- increase the public API without strong value
-- add implicit or hard-to-explain behavior
-- make internal state harder to reason about
-- couple the project to a specific framework or rendering strategy
+- Expand the public API without strong value
+- Add implicit or hard-to-explain behavior
+- Make internal state harder to reason about
+- Couple the project to a specific framework or rendering strategy
+- Weaken guarantees around deterministic output, replayed state, or worker fallback
 
 ### Add tests for behavior changes
 
@@ -93,23 +102,40 @@ If you change behavior, add or update tests.
 
 Especially useful tests cover:
 
-- invalid input handling
-- matrix state mutations
-- resize and matrix recreation behavior
-- item ordering guarantees
-- concurrency and serialization expectations
-- worker and non-worker execution paths
-- zero and empty-state edge cases
+- Invalid constructor arguments
+- Invalid item size handling
+- Append and recreate flows
+- Replay of remembered raw items after `recreateMatrix(...)`
+- Preservation of `columnCount` and `gap` after a successful recreate
+- `meta` passthrough
+- Readonly return shape guarantees
+- Worker and non-worker execution paths
+- `enableWorker()`, `disableWorker()`, and `terminateWorker()` behavior
+- Serialization and structured-clone expectations in worker mode
+- Empty-state and zero-item edge cases
+- Non-concurrent call expectations on a single instance
+- Snapshot integrity of internal state returned by `getState()`
 
 ### Be careful with performance claims
 
 If a change improves performance, include at least one of the following:
 
-- a benchmark update
 - a reproducible measurement
+- a benchmark update
 - a short explanation of the trade-off
 
-Do not trade away readability for tiny gains unless the benefit is clear.
+Do not trade away readability or API clarity for tiny gains unless the benefit is clear.
+
+### Keep documentation in sync
+
+If public behavior changes, update the docs in the same pull request.
+
+That usually means updating one or more of:
+
+- `README.md`
+- `README.ru.md`
+- Public API examples
+- JSDoc for public APIs
 
 ## Pull requests
 
@@ -124,7 +150,7 @@ pnpm test:run
 pnpm build
 ```
 
-If your change touches performance-sensitive code, also run:
+If your changes affect performance-critical code, please include benchmark results in the pull request description by running:
 
 ```bash
 pnpm benchmark
@@ -134,11 +160,11 @@ pnpm benchmark
 
 A good pull request should:
 
-- have a clear title
-- explain what changed and why
-- stay focused on one problem
-- include tests when applicable
-- update documentation when public behavior changes
+- Have a clear title
+- Explain what changed and why
+- Stay focused on one problem
+- Include tests when applicable
+- Update documentation when public behavior changes
 
 ### Keep PRs small
 
@@ -146,19 +172,16 @@ Smaller pull requests are easier to review and merge.
 
 If possible, separate refactors from behavior changes.
 
-## Commit style
-
-Please follow [Conventional Commits](https://www.conventionalcommits.org).
-
 ## Bug reports
 
 When reporting a bug, include:
 
-- package version
-- runtime or environment details
-- minimal reproduction
-- expected behavior
-- actual behavior
+- Package version
+- Runtime or environment details
+- Whether worker mode was enabled, disabled, or unavailable
+- A minimal reproduction
+- Expected behavior
+- Actual behavior
 
 A small reproducible example is much more useful than a long description.
 
@@ -166,26 +189,31 @@ A small reproducible example is much more useful than a long description.
 
 Feature requests are welcome, but they should fit the project goals:
 
-- small
-- predictable
-- low-level
-- framework-agnostic
+- Small
+- Predictable
+- Low-level
+- Framework-agnostic
 
 When proposing a feature, explain:
 
-- the problem
-- why the current API is not enough
-- the smallest useful addition
+- The problem
+- Why the current API is not enough
+- The smallest useful addition
+- Whether the feature affects worker mode, replayed state, return shapes, or determinism
 
 ## Documentation contributions
 
 Documentation improvements are always useful, especially when they improve:
 
-- wording clarity
+- Wording clarity
 - API explanations
-- examples
-- edge-case notes
-- consistency across English and Russian docs
+- Examples
+- Edge-case notes
+- Consistency across English and Russian docs
+
+## Commit style
+
+Please follow [Conventional Commits](https://www.conventionalcommits.org).
 
 ## Code style
 
@@ -200,5 +228,3 @@ By contributing, you agree that your contributions will be distributed under the
 ## Thanks
 
 Thanks for helping improve `masonry-blade`.
-
-Focused changes, clear reasoning, and careful tests are especially valuable.

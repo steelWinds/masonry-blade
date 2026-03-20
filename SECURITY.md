@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-`masonry-blade` is a young project. Security fixes are generally provided for the latest release only.
+`masonry-blade` is a young project. Security fixes are generally provided for the latest published release only.
 
 | Version | Supported |
 | ------- | --------- |
@@ -22,38 +22,57 @@ Reports may be submitted in English or Russian.
 
 To help with triage, please include:
 
-- affected version
-- runtime or environment details
-- reproduction steps
-- sample input or data
-- impact description
-- possible mitigation, if available
+- Affected version
+- Runtime or environment details
+- Reproduction steps
+- Sample input or data
+- Impact description
+- Whether worker mode was enabled, disabled, or unavailable
+- Any known mitigation or workaround
 
-## Security scope
+## What is likely in scope
 
 Issues that may be security-relevant include:
 
-- denial of service caused by specially crafted image metadata or input sets
-- excessive CPU or memory consumption with realistic exploit potential
-- worker-related message handling issues with real security impact
-- package publishing or supply-chain compromise
-- confirmed vulnerable dependencies that can affect consumers
+- Algorithmic denial of service from specially crafted large inputs with realistic exploit potential
+- Excessive CPU or memory consumption with realistic exploit potential
+- Worker message handling issues with real security impact
+- Package publishing or supply-chain compromise
+- Confirmed vulnerable dependencies that can affect consumers of the package
+
+## What is usually out of scope
 
 The following are usually out of scope unless they create a real security impact:
 
-- imperfect masonry balancing
-- incorrect column distribution
-- rendering differences between environments
-- ordinary bugs, documentation issues, or feature requests
+- Imperfect masonry balancing
+- Incorrect column distribution
+- Normal validation failures for invalid input
+- Rendering differences between environments
+- Errors caused by non-cloneable `meta` values in worker mode
+- Documentation bugs, API ergonomics issues, or feature requests
+- Environment-specific worker setup problems without a security consequence
+
+## Current attack surface
+
+`masonry-blade` is a layout engine. It does not fetch remote content, manipulate the DOM by itself, or execute arbitrary user code on behalf of consumers.
+
+That means the most realistic security reports are likely to involve:
+
+- Algorithmic denial of service
+- Memory pressure from hostile input
+- Worker transport behavior
+- Package integrity or supply-chain issues
+
+Framework rendering bugs, UI issues, and application-specific misuse are usually outside the library's scope.
 
 ## Response process
 
 The maintainer will try to:
 
-- acknowledge receipt within 7 days
-- investigate and validate the report
-- prepare a fix or mitigation when needed
-- coordinate responsible disclosure
+- Acknowledge receipt within 7 days
+- Investigate and validate the report
+- Prepare a fix or mitigation when needed
+- Coordinate responsible disclosure
 
 ## Disclosure
 
