@@ -4,7 +4,6 @@ about: Suggest an idea for this project
 title: Feature(v1.2.0) - i have idea by optimization engine
 labels: enhancement
 assignees: steelWinds
-
 ---
 
 **Is your feature request related to a problem? Please describe.**
