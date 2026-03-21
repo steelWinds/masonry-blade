@@ -80,18 +80,18 @@ new MasonryMatrix<TMeta = never>(rootWidth: number, columnCount = 1, gap = 0)
 ### Методы
 
 ```ts
-await matrix.appendItems(items);
+await matrix.append(items);
 ```
 
 Добавляет новую пачку элементов в текущую матрицу и возвращает колонки.
 
 ```ts
-await matrix.recreateMatrix(rootWidth, columnCount?, gap?)
+await matrix.recreate(rootWidth, columnCount?, gap?)
 ```
 
 Пересобирает матрицу с нуля по **всем ранее принятым элементам**, которые экземпляр сохранил внутри.
-Элементы, отфильтрованные во время `appendItems()`, не накапливаются и позже не участвуют в пересборке.
-Если `columnCount` и `gap` не переданы, используются последние сохранённые значения. Сначала это значения из конструктора, потом - значения последнего успешного `recreateMatrix(...)`.
+Элементы, отфильтрованные во время `append()`, не накапливаются и позже не участвуют в пересборке.
+Если `columnCount` и `gap` не переданы, используются последние сохранённые значения. Сначала это значения из конструктора, потом - значения последнего успешного `recreate(...)`.
 
 ```ts
 matrix.terminateWorker();
@@ -155,7 +155,7 @@ import { MasonryMatrix } from 'masonry-blade';
 
 const matrix = new MasonryMatrix(1200, 3, 16);
 
-const columns = await matrix.appendItems([
+const columns = await matrix.append([
 	{ id: '1', width: 1600, height: 900 },
 	{ id: '2', width: 800, height: 1200 },
 	{ id: '3', width: 1000, height: 1000 },
@@ -164,7 +164,7 @@ const columns = await matrix.appendItems([
 console.log(columns);
 ```
 
-`appendItems()` и `recreateMatrix()` всегда асинхронные. Даже если `Worker` не используется, вы всё равно работаете через `await`.
+`append()` и `recreate()` всегда асинхронные. Даже если `Worker` не используется, вы всё равно работаете через `await`.
 
 ## Как это работает
 
@@ -185,7 +185,7 @@ columnWidth = Math.max(0, (rootWidth - gap * (columnCount - 1)) / columnCount);
 ## Пример с `meta`
 
 `meta` не участвует в расчётах, но проходит через всю матрицу вместе с элементом.
-Если вы создаёте `MasonryMatrix<TMeta>`, каждый элемент в `appendItems(...)` должен передавать `meta: TMeta`.
+Если вы создаёте `MasonryMatrix<TMeta>`, каждый элемент в `append(...)` должен передавать `meta: TMeta`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -198,7 +198,7 @@ type PhotoMeta = {
 
 const matrix = new MasonryMatrix<PhotoMeta>(960, 2, 12);
 
-const columns = await matrix.appendItems([
+const columns = await matrix.append([
 	{
 		id: 'photo-1',
 		width: 1600,
@@ -285,7 +285,7 @@ const render = (columns) => {
 async function main() {
 	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
 
-	render(await matrix.appendItems(initialItems));
+	render(await matrix.append(initialItems));
 }
 
 main();
@@ -293,7 +293,7 @@ main();
 
 ## Пример: пересборка при resize
 
-`recreateMatrix()` берёт все уже принятые элементы и заново считает сетку.
+`recreate()` берёт все уже принятые элементы и заново считает сетку.
 
 ```js
 import { MasonryMatrix } from 'masonry-blade';
@@ -362,13 +362,13 @@ const render = (columns) => {
 async function main() {
 	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
 
-	render(await matrix.appendItems(initialItems));
+	render(await matrix.append(initialItems));
 
 	window.addEventListener('resize', async () => {
 		const width = container.clientWidth;
 		const columns = width < 768 ? 2 : width < 1200 ? 3 : 4;
 
-		const rebuilt = await matrix.recreateMatrix(width, columns);
+		const rebuilt = await matrix.recreate(width, columns);
 
 		render(rebuilt);
 	});
@@ -377,7 +377,7 @@ async function main() {
 main();
 ```
 
-Если вызвать только `recreateMatrix(newWidth)`, библиотека **не сбрасывает** сетку к `1` колонке и `gap = 0`. Она использует последние сохранённые `columnCount` и `gap`.
+Если вызвать только `recreate(newWidth)`, библиотека **не сбрасывает** сетку к `1` колонке и `gap = 0`. Она использует последние сохранённые `columnCount` и `gap`.
 
 ## Пример: управление `Worker`
 
@@ -390,11 +390,11 @@ let columns;
 
 matrix.disableWorker();
 
-columns = await matrix.appendItems([{ id: 1, width: 1, height: 1 }]); // гарантированно синхронный расчёт
+columns = await matrix.append([{ id: 1, width: 1, height: 1 }]); // гарантированно синхронный расчёт
 
 matrix.enableWorker();
 
-columns = await matrix.recreateMatrix(1200); // библиотека снова пытается использовать Worker
+columns = await matrix.recreate(1200); // библиотека снова пытается использовать Worker
 
 console.log(columns);
 ```
@@ -403,13 +403,13 @@ console.log(columns);
 
 ### Мутация выходных данных:
 
-- Не мутируйте возвращённые колонки и элементы из `appendItems()` и `recreateMatrix()`. Библиотека держит внутреннее состояние в этих же структурах. Если нужен безопасный снимок служебного состояния, используйте `getState()`.
-- Не мутируйте входные элементы после передачи в `appendItems()`. Принятые raw items сохраняются внутри и потом используются в `recreateMatrix()`. Считайте переданные элементы и вложенные значения `meta` неизменяемыми независимо от того, шёл расчёт синхронно или через `Worker`.
+- Не мутируйте возвращённые колонки и элементы из `append()` и `recreate()`. Библиотека держит внутреннее состояние в этих же структурах. Если нужен безопасный снимок служебного состояния, используйте `getState()`.
+- Не мутируйте входные элементы после передачи в `append()`. Принятые raw items сохраняются внутри и потом используются в `recreate()`. Считайте переданные элементы и вложенные значения `meta` неизменяемыми независимо от того, шёл расчёт синхронно или через `Worker`.
 - В worker-режиме payload для воркера проходит через structured clone, но raw items, сохранённые внутри экземпляра, всё равно остаются исходными принятыми объектами.
 
 ### Работа с невалидными объектами:
 
-- `appendItems()` молча пропускает элементы, у которых `width` или `height` не является положительным конечным числом. Такие элементы не попадают в текущую раскладку и не накапливаются для будущих вызовов `recreateMatrix()`.
+- `append()` молча пропускает элементы, у которых `width` или `height` не является положительным конечным числом. Такие элементы не попадают в текущую раскладку и не накапливаются для будущих вызовов `recreate()`.
 
 ### Конкурентность:
 
@@ -442,8 +442,8 @@ console.log(columns);
 - `columnCount <= 0` или `columnCount` не является целым числом
 - `gap < 0` или `gap` не является конечным числом
 
-Невалидные элементы в `appendItems()` не выбрасывают ошибку, а пропускаются. Элемент пропускается, если его `width` или `height` не является положительным конечным числом.
-Пропущенные элементы не попадают в текущую раскладку и не сохраняются для будущих вызовов `recreateMatrix()`.
+Невалидные элементы в `append()` не выбрасывают ошибку, а пропускаются. Элемент пропускается, если его `width` или `height` не является положительным конечным числом.
+Пропущенные элементы не попадают в текущую раскладку и не сохраняются для будущих вызовов `recreate()`.
 
 Ошибки верхнего уровня приходят как `MasonryMatrixError`. Внутри `cause` может лежать исходная причина, в том числе ошибка `Worker`, ошибка structured clone / `postMessage(...)` или ошибка валидации движка. Ошибка отправки payload в `Worker` обычно приходит как исходная причина внутри цепочки `cause`, обёрнутой сообщением `Failed to update internal state`.
 
