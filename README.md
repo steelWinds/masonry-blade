@@ -1,14 +1,5 @@
 # masonry-blade
 
-## [Русская версия](./README.ru.md)
-
-<p>
-  <img align="right" width="30%" src="./.github/logo.png" alt="masonry-blade logo">
-</p>
-
-Zero-dependency engine for calculating masonry-style image grids.
-If `Web Worker` is available in the current environment, calculations are offloaded to it.
-
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 [![Module type: ESM](https://img.shields.io/badge/module%20type-esm-brightgreen)](https://github.com/voxpelli/badges-cjs-esm)
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
@@ -18,21 +9,25 @@ If `Web Worker` is available in the current environment, calculations are offloa
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/masonry-blade)
 [![codecov](https://codecov.io/gh/steelWinds/masonry-blade/graph/badge.svg?token=48NKR93X2A)](https://codecov.io/gh/steelWinds/masonry-blade)
 
-## What it does
+## [Русская версия](./README.ru.md)
 
-`masonry-blade` calculates a masonry matrix for image data.
+<p>
+  <img align="right" width="150" height="150" src="./.github/logo.webp" alt="masonry-blade logo">
+</p>
 
-It does not render UI.
-It only distributes items across equal-width columns and returns a structure that you can render in any interface.
+**masonry-blade** is a small, fast, dependency-free engine for masonry grid layout calculation.
 
-## Why use it
+- **🪶 Very small.** It solves one problem and does not grow into a framework.
+- **⚡ Fast.** Greedy balancing, mutable state, and minimal overhead.
+- **⚖️ Balanced.** Each new item is placed into the shortest column.
+- **📦 Dependency-free.** Only calculation, coordinates, and types.
+- **🎨 UI-agnostic.** Works with `React`, `Vue`, `Svelte`, `Canvas`, and `Vanilla JS`.
+- **🏷️ Metadata-friendly.** Grid items can carry any extra data you need for rendering.
+- **💤 Lazy-load friendly.** Append items in batches without losing the current layout.
+- **🔄 Rebuildable.** Accepted items can be laid out again for a new width, column count, or `gap`.
+- **🧵 `Web Worker` support.** If a worker is unavailable or disabled, calculations fall back to sync mode.
 
-- Zero dependencies.
-- UI-agnostic.
-- Optional `Web Worker` offloading.
-- Incremental appends for infinite scroll and progressive loading.
-- Full matrix rebuild on resize without re-passing the original items.
-- Generic `meta` support for app-specific data.
+> You pass in source item sizes, and it returns ready-to-render `x`, `y`, `width`, and `height` for any UI. No DOM, no framework coupling, no bloated API.
 
 ## Installation
 
@@ -50,311 +45,420 @@ pnpm add masonry-blade
 
 ## Public API
 
+The package exports:
+
+- `MasonryMatrix` - the main runtime facade
+- `MasonryMatrixError` and `MASONRY_MATRIX_ERROR_MESSAGES` - facade errors and constants
+- `MatrixEngineError` and `MATRIX_ENGINE_ERRORS` - low-level engine errors and constants
+- TypeScript contracts: `Meta`, `SourceItem`, `MatrixItem`, `WithMeta`, `MasonryMatrixState`
+
 ```ts
 import {
 	MasonryMatrix,
-	MatrixError,
-	MATRIX_ERROR_MESSAGES,
-	type ImageItem,
+	MasonryMatrixError,
+	MASONRY_MATRIX_ERROR_MESSAGES,
+	MatrixEngineError,
+	MATRIX_ENGINE_ERRORS,
 	type MatrixItem,
+	type MasonryMatrixState,
+	type Meta,
+	type SourceItem,
+	type WithMeta,
 } from 'masonry-blade';
 ```
 
-Exports:
+### Constructor
 
-- `MasonryMatrix` — main class for building the matrix.
-- `MatrixError` — custom library error.
-- `MATRIX_ERROR_MESSAGES` — exported error message constants.
-- `ImageItem<T>` — input item type.
-- `MatrixItem<T>` — output item type after placement.
+```ts
+new MasonryMatrix<TMeta = never>(rootWidth: number, columnCount = 1, gap = 0)
+```
+
+- `rootWidth` - container width
+- `columnCount` - number of columns
+- `gap` - horizontal space between columns and vertical space between items
+
+### Methods
+
+```ts
+await matrix.append(items);
+```
+
+Appends a new batch of items to the current matrix and returns the columns.
+
+```ts
+await matrix.recreate(rootWidth, columnCount?, gap?)
+```
+
+Rebuilds the matrix from scratch using **all previously accepted items** stored inside the instance.
+Items filtered out during `append()` are not accumulated and do not take part in later rebuilds.
+If `columnCount` and `gap` are omitted, the last stored values are reused. At first these are the constructor values, then the values from the last successful `recreate(...)`.
+
+```ts
+matrix.terminateWorker();
+```
+
+Stops the current `Worker`, if one was created. If a worker calculation is still running, the current `Promise` is rejected.
+
+```ts
+matrix.disableWorker();
+```
+
+Stops the current `Worker` and forces all following calculations into sync mode.
+
+```ts
+matrix.enableWorker();
+```
+
+Re-enables worker mode and immediately tries to create a new `Worker`. If the environment does not support it or creation fails, the library stays in sync mode.
+
+```ts
+const state = matrix.getState();
+```
+
+Returns a snapshot of the current facade state: `columnCount`, `columnWidth`, `gap`, `workerCreated`, `workerDisabled`, and copies of `columnsHeights` and `order`.
+This is the safe way to inspect internal service state without touching live internal columns.
+
+## Expected input and output
+
+Input items use the exported `SourceItem` contract:
+
+```ts
+type SourceItem = {
+	id: string | number;
+	width: number;
+	height: number;
+};
+```
+
+Output items use the exported `MatrixItem` contract:
+
+```ts
+type MatrixItem = {
+  id: string | number;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+};
+
+readonly (readonly WithMeta<MatrixItem, TMeta>[])[]
+```
+
+If you create `new MasonryMatrix<TMeta>(...)`, every input item must include `meta: TMeta`, and every output item will keep the same `meta`.
+
+Important: output `width` and `height` are already scaled to the column width. They are not the original dimensions.
 
 ## Quick start
 
 ```ts
-import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
+import { MasonryMatrix } from 'masonry-blade';
 
-const matrix = new MasonryMatrix(1200, 3);
+const matrix = new MasonryMatrix(1200, 3, 16);
 
-const items: ImageItem[] = [
-	{
-		id: 'photo-1',
-		src: 'https://example.com/1.jpg',
-		width: 1200,
-		height: 900,
-	},
-	{
-		id: 'photo-2',
-		src: 'https://example.com/2.jpg',
-		width: 1000,
-		height: 1500,
-	},
-	{
-		id: 'photo-3',
-		src: 'https://example.com/3.jpg',
-		width: 1600,
-		height: 900,
-	},
-];
-
-const columns: readonly MatrixItem[][] = await matrix.appendItems(items);
+const columns = await matrix.append([
+	{ id: '1', width: 1600, height: 900 },
+	{ id: '2', width: 800, height: 1200 },
+	{ id: '3', width: 1000, height: 1000 },
+]);
 
 console.log(columns);
-// [
-//   [ { id, src, width, height }, ... ],
-//   [ { id, src, width, height }, ... ],
-//   [ { id, src, width, height }, ... ],
-// ]
 ```
+
+`append()` and `recreate()` are always async. Even without a `Worker`, you still use `await`.
 
 ## How it works
 
-1. Create a `MasonryMatrix` with container width and column count.
-2. Pass items to `appendItems(...)`.
-3. Render the returned columns in your UI.
-4. Call `recreateMatrix(...)` when width or column count changes.
+Internally, the flow is simple:
 
-`recreateMatrix(...)` rebuilds the layout from the internal list of already appended raw items.
-You do not need to pass the same items again.
-
-Each output item always gets the current column width.
-Its height is recalculated proportionally from the original aspect ratio.
-
-## Layout strategy
-
-Each next item is placed into the current shortest column.
-
-This is a greedy balancing strategy.
-It does not provide a formal guarantee of a fixed maximum height gap between columns, but it is fast and gives a strong quality/speed trade-off for this kind of engine.
-
-The library supports images only.
-`width` and `height` must be known in advance.
-
-## Types
+1. First, the column width is calculated:
 
 ```ts
-type ImageItem<T = never> = {
-	id: number | string;
-	src: string;
-	width: number;
-	height: number;
-} & (T extends never ? {} : { meta: T });
-
-// conceptual shape
-
-type MatrixItem<T = never> = {
-	id: number | string;
-	src: string;
-	width: number; // column width
-	height: number; // scaled height inside the matrix
-} & (T extends never ? {} : { meta: T });
+columnWidth = Math.max(0, (rootWidth - gap * (columnCount - 1)) / columnCount);
 ```
 
-Use `meta` for any related data such as `alt`, `title`, `author`, `href`, internal IDs, flags, and so on.
+2. Item height is scaled by the original aspect ratio.
+3. The next item is placed into the shortest column.
+4. The library calculates `x` and `y` for a virtual canvas.
 
-If you provide a generic `T`, both `ImageItem<T>` and `MatrixItem<T>` include `meta: T`.
+This gives you a fast and visually even layout without complex heuristics.
 
 ## Example with `meta`
 
+`meta` does not affect layout calculation, but it travels through the matrix together with the item.
+If you create `MasonryMatrix<TMeta>`, every item passed to `append(...)` must include `meta: TMeta`.
+
 ```ts
-import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
+import { MasonryMatrix } from 'masonry-blade';
 
 type PhotoMeta = {
+	src: string;
 	alt: string;
 	author: string;
-	href: string;
 };
 
-const matrix = new MasonryMatrix<PhotoMeta>(900, 2);
+const matrix = new MasonryMatrix<PhotoMeta>(960, 2, 12);
 
-const items: readonly ImageItem<PhotoMeta>[] = [
+const columns = await matrix.append([
 	{
-		id: 'a',
-		src: 'https://example.com/a.jpg',
-		width: 1200,
-		height: 800,
+		id: 'photo-1',
+		width: 1600,
+		height: 900,
 		meta: {
-			alt: 'Mountains at sunrise',
+			src: '/images/1.jpg',
+			alt: 'Mountain lake',
 			author: 'Kate',
-			href: '/photos/a',
+		},
+	},
+]);
+
+console.log(columns[0][0].meta.src);
+```
+
+## Example with coordinates
+
+Below is a self-contained Vanilla JS example with absolute positioning:
+
+```js
+import { MasonryMatrix } from 'masonry-blade';
+
+const container = document.createElement('div');
+
+container.style.position = 'relative';
+
+window.document.body.append(container);
+
+const initialItems = [
+	{
+		id: 'photo-1',
+		width: 1600,
+		height: 900,
+		meta: {
+			title: 'Mountain lake',
 		},
 	},
 	{
-		id: 'b',
-		src: 'https://example.com/b.jpg',
-		width: 800,
-		height: 1200,
+		id: 'photo-2',
+		width: 900,
+		height: 1350,
 		meta: {
-			alt: 'City lights',
-			author: 'Alex',
-			href: '/photos/b',
+			title: 'Pine forest',
+		},
+	},
+	{
+		id: 'photo-3',
+		width: 1200,
+		height: 800,
+		meta: {
+			title: 'Green Apple',
+		},
+	},
+	{
+		id: 'photo-4',
+		width: 900,
+		height: 900,
+		meta: {
+			title: 'Red Apple',
 		},
 	},
 ];
 
-const columns: readonly MatrixItem<PhotoMeta>[][] =
-	await matrix.appendItems(items);
-const firstItem: MatrixItem<PhotoMeta> = columns[0][0];
+const render = (columns) => {
+	const placedItems = columns.flat();
 
-console.log(firstItem.meta.author);
-// Kate
+	container.innerHTML = '';
+
+	for (const item of placedItems) {
+		const node = document.createElement('div');
+
+		node.style.position = 'absolute';
+		node.style.left = `0px`;
+		node.style.top = `0px`;
+		node.style.transform = `translate(${item.x}px, ${item.y}px)`;
+		node.style.width = `${item.width}px`;
+		node.style.height = `${item.height}px`;
+		node.style.background = 'red';
+
+		container.appendChild(node);
+	}
+};
+
+async function main() {
+	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
+
+	render(await matrix.append(initialItems));
+}
+
+main();
 ```
 
 ## Example: rebuild on resize
 
-```ts
-import { MasonryMatrix, type ImageItem, type MatrixItem } from 'masonry-blade';
+`recreate()` takes all already accepted items and recalculates the grid.
 
-const matrix = new MasonryMatrix(1200, 4);
+```js
+import { MasonryMatrix } from 'masonry-blade';
 
-const items: readonly ImageItem[] = [
-	{ id: 1, src: '/1.jpg', width: 1200, height: 800 },
-	{ id: 2, src: '/2.jpg', width: 900, height: 1400 },
-	{ id: 3, src: '/3.jpg', width: 1600, height: 900 },
+const container = document.createElement('div');
+
+container.style.position = 'relative';
+
+window.document.body.append(container);
+
+const initialItems = [
+	{
+		id: 'photo-1',
+		width: 1600,
+		height: 900,
+		meta: {
+			title: 'Mountain lake',
+		},
+	},
+	{
+		id: 'photo-2',
+		width: 900,
+		height: 1350,
+		meta: {
+			title: 'Pine forest',
+		},
+	},
+	{
+		id: 'photo-3',
+		width: 1200,
+		height: 800,
+		meta: {
+			title: 'Green Apple',
+		},
+	},
+	{
+		id: 'photo-4',
+		width: 900,
+		height: 900,
+		meta: {
+			title: 'Red Apple',
+		},
+	},
 ];
 
-const desktopColumns: readonly MatrixItem[][] = await matrix.appendItems(items);
-const mobileColumns: readonly MatrixItem[][] = await matrix.recreateMatrix(
-	640,
-	2,
-);
+const render = (columns) => {
+	const placedItems = columns.flat();
 
-console.log(desktopColumns.length);
-// 4
+	container.innerHTML = '';
 
-console.log(mobileColumns.length);
-// 2
-```
+	for (const item of placedItems) {
+		const node = document.createElement('div');
 
-## API reference
+		node.style.position = 'absolute';
+		node.style.left = `0px`;
+		node.style.top = `0px`;
+		node.style.transform = `translate(${item.x}px, ${item.y}px)`;
+		node.style.width = `${item.width}px`;
+		node.style.height = `${item.height}px`;
+		node.style.background = 'red';
 
-### `new MasonryMatrix(rootWidth, count?)`
-
-Creates a new matrix instance.
-
-| Parameter   | Type     | Required | Description                    |
-| ----------- | -------- | -------- | ------------------------------ |
-| `rootWidth` | `number` | yes      | Container width                |
-| `count`     | `number` | no       | Number of columns, default `1` |
-
-### `await appendItems(items)`
-
-Adds a new batch of items to the current matrix and returns the columns.
-
-```ts
-appendItems(items: readonly ImageItem<T>[]): Promise<readonly MatrixItem<T>[][]>
-```
-
-Useful for initial load, infinite scroll, and progressive image loading.
-
-### `await recreateMatrix(rootWidth, count?)`
-
-Completely rebuilds the matrix with a new container width and/or a new column count, using all previously appended items.
-
-```ts
-recreateMatrix(rootWidth: number, count?: number): Promise<readonly MatrixItem<T>[][]>
-```
-
-Useful on resize, breakpoint changes, or layout mode switches.
-
-### `terminateWorker()`
-
-Forcefully terminates the internal worker if it has been created.
-The next call to `appendItems(...)` or `recreateMatrix(...)` creates a new worker automatically.
-
-## Errors
-
-All library errors are thrown as `MatrixError`.
-
-```ts
-import {
-	MasonryMatrix,
-	MatrixError,
-	MATRIX_ERROR_MESSAGES,
-	type ImageItem,
-} from 'masonry-blade';
-
-const matrix = new MasonryMatrix(800, 2);
-const items: ImageItem[] = [
-	{ id: '1', src: '/1.jpg', width: 1000, height: 700 },
-];
-
-try {
-	await matrix.appendItems(items);
-} catch (error: unknown) {
-	if (error instanceof MatrixError) {
-		if (error.message === MATRIX_ERROR_MESSAGES.APPEND_ITEMS) {
-			console.error('Append failed');
-		}
-
-		console.error(error.cause);
+		container.appendChild(node);
 	}
+};
+
+async function main() {
+	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
+
+	render(await matrix.append(initialItems));
+
+	window.addEventListener('resize', async () => {
+		const width = container.clientWidth;
+		const columns = width < 768 ? 2 : width < 1200 ? 3 : 4;
+
+		const rebuilt = await matrix.recreate(width, columns);
+
+		render(rebuilt);
+	});
 }
+
+main();
 ```
 
-Available error messages:
+If you call only `recreate(newWidth)`, the library does **not** reset the grid to `1` column and `gap = 0`. It reuses the last stored `columnCount` and `gap`.
 
-- `MATRIX_ERROR_MESSAGES.APPEND_ITEMS`
-- `MATRIX_ERROR_MESSAGES.CONCURRENT_CALL`
-- `MATRIX_ERROR_MESSAGES.RECREATE_MATRIX`
-- `MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE`
-- `MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER`
-- `MATRIX_ERROR_MESSAGES.WORKER_ERROR`
-- `MATRIX_ERROR_MESSAGES.WORKER_TERMINATED`
+## Example: `Worker` control
 
-## Runtime constraints
+```ts
+import { MasonryMatrix } from 'masonry-blade';
 
-### Concurrent calls are not supported
+const matrix = new MasonryMatrix(1200, 3, 16);
 
-Do not call `appendItems(...)` and/or `recreateMatrix(...)` in parallel on the same `MasonryMatrix` instance.
+let columns;
 
-These operations must be serialized by the caller.
+matrix.disableWorker();
 
-If a second call starts while the previous matrix update is still in flight, the library throws a `MatrixError`.
+columns = await matrix.append([{ id: 1, width: 1, height: 1 }]); // guaranteed sync calculation
 
-In practice:
+matrix.enableWorker();
 
-- do not start a second `appendItems(...)` before the previous one finishes;
-- do not call `recreateMatrix(...)` while `appendItems(...)` is running;
-- do not call `appendItems(...)` while `recreateMatrix(...)` is running.
+columns = await matrix.recreate(1200); // the library tries to use Worker again
 
-### Worker mode uses structured clone
-
-If `Worker` is available in the current environment, matrix data is sent through `postMessage(...)`.
-
-Because of that, transferred data must be compatible with the structured clone algorithm.
-
-This matters most for `meta` when you use `ImageItem<T>` / `MatrixItem<T>` with a generic type.
-
-Do not put non-cloneable values into `meta`, for example:
-
-- functions;
-- DOM nodes;
-- class instances with non-serializable internal state;
-- unsupported custom objects for your target runtime.
-
-If the payload cannot be cloned for worker transfer, the library throws a `MatrixError`.
-
-Typical cases:
-
-- `appendItems(...)` throws if the provided batch cannot be cloned;
-- `recreateMatrix(...)` throws if previously accumulated raw items cannot be cloned.
-
-A good rule of thumb: keep `meta` close to JSON-like application data.
-
-### Returned columns are internal state references
-
-Treat returned columns as read-only.
-
-Do not mutate them manually with `push`, `splice`, direct assignment, and so on.
-
-In worker mode, do not rely on referential identity for `meta`, because data is transferred through structured clone.
+console.log(columns);
+```
 
 ## Important notes
 
-- Items with `width <= 0` or `height <= 0` are silently skipped.
-- `count = 0` is allowed, but it produces an empty matrix mode.
-- If `Worker` is not available, calculations run on the main thread.
-- The library knows nothing about the DOM, React, Vue, lazy loading, card rendering, or styling. It only returns layout data.
+### Mutation source:
+
+- Do not mutate the columns or items returned by `append()` and `recreate()`. The library keeps its internal state in the same structures. If you need a safe snapshot of service state, use `getState()`.
+- Do not mutate input items after passing them to `append()`. Accepted raw items are stored internally and later reused by `recreate()`. Treat passed items and nested `meta` values as immutable, regardless of whether calculation ran synchronously or through a `Worker`.
+- In worker mode, the payload sent to the worker goes through structured clone, but raw items stored inside the instance still remain the original accepted objects.
+
+### Work with invalid items:
+
+- `append()` silently skips items whose `width` or `height` is not a positive finite number. Such items do not enter the current layout and are not accumulated for future `recreate()` calls.
+
+### Concurrent:
+
+- A single `MasonryMatrix` instance does not allow concurrent calls. `await` one call before starting the next.
+
+### Work with Web-Worker:
+
+- `terminateWorker()`, `disableWorker()`, and `enableWorker()` can interrupt a running worker calculation.
+- If `Worker` is unavailable or creation fails, the library automatically falls back to sync mode and stays there until you explicitly call `enableWorker()`.
+- After `disableWorker()`, sync mode stays active until you explicitly call `enableWorker()`.
+- If calculation runs through a `Worker`, `meta` data must support structured clone. Functions, DOM nodes, and similar values may fail on `postMessage(...)`.
+
+### Get current MasonryMatrix state:
+
+- `getState()` returns a snapshot of internal service state. Its `columnsHeights` and `order` fields are cloned, so they can be read without risking damage to the instance state.
+
+### Limitations:
+
+- The library has no API for removing, updating, or selectively reordering individual items.
+- The library does not work with the DOM directly. Container measurement, breakpoint choice, and rendering are up to you.
+- If `gap` consumes the full container width, column width becomes `0` rather than going negative.
+
+## Errors and validation
+
+The library validates matrix parameters and filters item batches.
+
+Invalid matrix parameters:
+
+- `rootWidth < 0` or `rootWidth` is not a finite number
+- `columnCount <= 0` or `columnCount` is not an integer
+- `gap < 0` or `gap` is not a finite number
+
+Invalid items passed to `append()` do not throw. They are skipped instead. An item is skipped if its `width` or `height` is not a positive finite number.
+Skipped items do not enter the current layout and are not stored for future `recreate()` calls.
+
+Top-level errors are exposed as `MasonryMatrixError`. The `cause` may contain the original reason, including a `Worker` error, a structured clone / `postMessage(...)` error, or an engine validation error. A payload send failure usually appears as the original cause inside a `cause` chain wrapped by `Failed to update internal state`.
+
+Typical top-level messages:
+
+- `Failed to append items to the matrix`
+- `Failed to recreate the matrix`
+- `Concurrent call is not allowed`
+
+Typical internal causes in `cause`:
+
+- `Failed to update internal state`
+- `Failed to receive a message from the worker`
+- `Worker execution failed`
+- `Worker was terminated`
 
 ## Benchmark
 
@@ -362,7 +466,7 @@ In worker mode, do not rely on referential identity for `meta`, because data is 
 pnpm benchmark
 ```
 
-Latest benchmark results: [benchmark/benchmark-results.md](benchmark/benchmark-results.md)
+Latest results: [benchmark/benchmark-results.md](benchmark/benchmark-results.md)
 
 ## Contributing
 
@@ -379,6 +483,6 @@ This project is licensed under MPL 2.0.
 ## Links
 
 - Author: [@steelWinds](https://github.com/steelWinds)
-- Issues: [New issue](https://github.com/steelWinds/masonry-blade/issues)
+- Issues: [Open an issue](https://github.com/steelWinds/masonry-blade/issues)
 - Telegram: @plutograde
-- Email: [Send me an email](mailto:kirillsurov0@gmail.com)
+- Email: [Send an email](mailto:kirillsurov0@gmail.com)

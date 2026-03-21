@@ -1,79 +1,70 @@
-# MasonryMatrix Benchmark Report
+# MasonryMatrix Benchmark
 
-- Benchmark date (start): 2026-03-18T18:41:12.550Z
-- Benchmark date (end): 2026-03-18T18:41:19.149Z
-- Total wall-clock duration: 6,599 ms
-- Node.js: v20.19.0
-- V8: 11.3.244.8-node.26
+## Setup
+
 - Seed: 2026
 - Root width: 3840
-- GC exposed: yes
-
-## Benchmark configuration
-
-- recreateMatrix samples per scenario: 7
-- appendItems samples per scenario: 3
+- Gap: 16
+- Samples per scenario: 5
 - Warmup iterations per scenario: 1
-- recreateMatrix columns: 8, 16, 32
-- recreateMatrix item counts: 1,000, 100,000, 1,000,000
-- appendItems columns: 8, 16, 32
-- appendItems base items: 1,000,000
-- appendItems delta counts: 100, 1,000, 10,000
+- GC exposed: no
+- Modes: plain, meta-object
 
-## Machine at start
+## How to read it
 
-- Hostname: nuphy
-- Platform: win32
-- Release: 10.0.26200
-- Architecture: x64
-- CPU count: 20
-- CPU model: 13th Gen Intel(R) Core(TM) i5-13500
-- Load average (1m, 5m, 15m): 0.00, 0.00, 0.00
-- Total memory: 31.73 GiB (34,064,785,408 bytes)
-- Free memory: 15.81 GiB (16,973,828,096 bytes)
-- RSS: 0.08 GiB (88,711,168 bytes)
-- Heap used: 0.02 GiB (24,931,272 bytes)
-- Heap total: 0.03 GiB (34,828,288 bytes)
+- `plain` uses items without `meta`.
+- `meta-object` uses the current MasonryMatrix API with an object in `meta`.
+- `recreate` measures only the rebuild step after the matrix has already been populated.
+- `append` measures only the new batch append step on top of a preloaded matrix.
 
-## Machine at end
+## Highlights
 
-- Free memory: 14.93 GiB (16,028,651,520 bytes)
-- RSS: 1.18 GiB (1,264,697,344 bytes)
-- Heap used: 1.07 GiB (1,144,050,608 bytes)
-- Heap total: 1.11 GiB (1,196,466,176 bytes)
+- Fastest rebuild of 1,000,000 items: **plain**, 8 columns, **60.395 ms** median, 16,557,580 items/sec.
+- Fastest append of 10,000 items onto a 1,000,000-item matrix: **plain**, 8 columns, **6.520 ms** median, 1,533,836 items/sec.
+- At 8 columns and 1,000,000 items, adding a meta object changes rebuild median from **60.395 ms** to **130.015 ms** (+115.3%).
 
-## Scenario notes
+## Results
 
-- Timed sections exclude synthetic data generation.
-- recreateMatrix measurements exclude base dataset generation and the initial matrix fill.
-- appendItems measurements exclude synthetic delta dataset generation and the preload of 1,000,000 items.
-- recreateMatrix samples reuse the same prepared matrix for repeated rebuilds.
-- appendItems samples prepare a fresh preloaded matrix per sample to keep the starting state stable.
+| Operation | Mode        | Columns | Workload                         |     Median |        P95 |           Throughput |
+| --------- | ----------- | ------: | -------------------------------- | ---------: | ---------: | -------------------: |
+| append    | meta-object |       8 | append 1,000 items to 1,000,000  |   7.691 ms |  40.132 ms |    130,015 items/sec |
+| append    | meta-object |       8 | append 10,000 items to 1,000,000 |   9.741 ms |  10.591 ms |  1,026,568 items/sec |
+| append    | meta-object |      16 | append 1,000 items to 1,000,000  |   8.758 ms |  10.562 ms |    114,185 items/sec |
+| append    | meta-object |      16 | append 10,000 items to 1,000,000 |   8.961 ms |   9.537 ms |  1,116,009 items/sec |
+| append    | meta-object |      32 | append 1,000 items to 1,000,000  |  10.140 ms |  37.694 ms |     98,616 items/sec |
+| append    | meta-object |      32 | append 10,000 items to 1,000,000 |  12.560 ms |  14.426 ms |    796,185 items/sec |
+| append    | plain       |       8 | append 1,000 items to 1,000,000  |   5.245 ms |  15.853 ms |    190,654 items/sec |
+| append    | plain       |       8 | append 10,000 items to 1,000,000 |   6.520 ms |   8.965 ms |  1,533,836 items/sec |
+| append    | plain       |      16 | append 1,000 items to 1,000,000  |   6.234 ms |   7.199 ms |    160,406 items/sec |
+| append    | plain       |      16 | append 10,000 items to 1,000,000 |   7.942 ms |   9.919 ms |  1,259,192 items/sec |
+| append    | plain       |      32 | append 1,000 items to 1,000,000  |   8.622 ms |   9.274 ms |    115,985 items/sec |
+| append    | plain       |      32 | append 10,000 items to 1,000,000 |   8.626 ms |  10.587 ms |  1,159,246 items/sec |
+| recreate  | meta-object |       8 | rebuild 100,000 items            |  13.742 ms |  14.183 ms |  7,276,749 items/sec |
+| recreate  | meta-object |       8 | rebuild 1,000,000 items          | 130.015 ms | 245.307 ms |  7,691,432 items/sec |
+| recreate  | meta-object |      16 | rebuild 100,000 items            |  16.097 ms |  39.560 ms |  6,212,415 items/sec |
+| recreate  | meta-object |      16 | rebuild 1,000,000 items          | 152.910 ms | 451.581 ms |  6,539,803 items/sec |
+| recreate  | meta-object |      32 | rebuild 100,000 items            |  15.586 ms |  20.078 ms |  6,416,138 items/sec |
+| recreate  | meta-object |      32 | rebuild 1,000,000 items          | 172.211 ms | 350.220 ms |  5,806,820 items/sec |
+| recreate  | plain       |       8 | rebuild 100,000 items            |   5.959 ms |   7.707 ms | 16,780,776 items/sec |
+| recreate  | plain       |       8 | rebuild 1,000,000 items          |  60.395 ms |  61.454 ms | 16,557,580 items/sec |
+| recreate  | plain       |      16 | rebuild 100,000 items            |  12.039 ms |  12.834 ms |  8,306,062 items/sec |
+| recreate  | plain       |      16 | rebuild 1,000,000 items          | 108.444 ms | 117.156 ms |  9,221,383 items/sec |
+| recreate  | plain       |      32 | rebuild 100,000 items            |  17.327 ms |  45.290 ms |  5,771,173 items/sec |
+| recreate  | plain       |      32 | rebuild 1,000,000 items          | 158.391 ms | 695.739 ms |  6,313,494 items/sec |
 
-## recreateMatrix
+## Plain vs meta-object overhead
 
-| Operation      | Columns | Base items | Added items | Timed items | Samples | Warmup | Min ms | Median ms | Mean ms |  P95 ms |  Max ms | StdDev ms | Median ops/sec | Median items/sec |
-| -------------- | ------: | ---------: | ----------: | ----------: | ------: | -----: | -----: | --------: | ------: | ------: | ------: | --------: | -------------: | ---------------: |
-| recreateMatrix |       8 |      1,000 |           0 |       1,000 |       7 |      1 |  0.040 |     0.289 |   0.209 |   0.394 |   0.429 |     0.148 |       3455.425 |        3,455,425 |
-| recreateMatrix |      16 |      1,000 |           0 |       1,000 |       7 |      1 |  0.041 |     0.049 |   0.059 |   0.094 |   0.105 |     0.021 |      20449.898 |       20,449,898 |
-| recreateMatrix |      32 |      1,000 |           0 |       1,000 |       7 |      1 |  0.050 |     0.059 |   0.067 |   0.108 |   0.127 |     0.025 |      16920.474 |       16,920,474 |
-| recreateMatrix |       8 |    100,000 |           0 |     100,000 |       7 |      1 |  3.882 |     4.459 |   4.523 |   5.247 |   5.395 |     0.496 |        224.266 |       22,426,553 |
-| recreateMatrix |      16 |    100,000 |           0 |     100,000 |       7 |      1 |  4.434 |     4.524 |   4.780 |   5.242 |   5.266 |     0.355 |        221.038 |       22,103,844 |
-| recreateMatrix |      32 |    100,000 |           0 |     100,000 |       7 |      1 |  5.352 |     6.444 |   9.801 |  20.881 |  22.655 |     6.470 |        155.193 |       15,519,275 |
-| recreateMatrix |       8 |  1,000,000 |           0 |   1,000,000 |       7 |      1 | 51.833 |    52.855 |  63.225 | 104.167 | 125.730 |    25.524 |         18.920 |       18,919,543 |
-| recreateMatrix |      16 |  1,000,000 |           0 |   1,000,000 |       7 |      1 | 54.624 |    56.913 |  67.668 | 111.284 | 133.743 |    27.022 |         17.571 |       17,570,616 |
-| recreateMatrix |      32 |  1,000,000 |           0 |   1,000,000 |       7 |      1 | 65.327 |    67.219 |  79.386 | 122.103 | 137.669 |    24.722 |         14.877 |       14,876,813 |
-
-## appendItems
-
-| Operation   | Columns | Base items | Added items | Timed items | Samples | Warmup | Min ms | Median ms | Mean ms | P95 ms | Max ms | StdDev ms | Median ops/sec | Median items/sec |
-| ----------- | ------: | ---------: | ----------: | ----------: | ------: | -----: | -----: | --------: | ------: | -----: | -----: | --------: | -------------: | ---------------: |
-| appendItems |       8 |  1,000,000 |         100 |         100 |       3 |      1 |  4.802 |     5.128 |   5.088 |  5.315 |  5.336 |     0.220 |        195.027 |           19,503 |
-| appendItems |       8 |  1,000,000 |       1,000 |       1,000 |       3 |      1 |  4.960 |     5.118 |   5.272 |  5.675 |  5.737 |     0.335 |        195.393 |          195,393 |
-| appendItems |       8 |  1,000,000 |      10,000 |      10,000 |       3 |      1 |  5.739 |     5.916 |   5.971 |  6.223 |  6.257 |     0.215 |        169.027 |        1,690,274 |
-| appendItems |      16 |  1,000,000 |         100 |         100 |       3 |      1 |  5.515 |     5.619 |   5.608 |  5.684 |  5.691 |     0.072 |        177.980 |           17,798 |
-| appendItems |      16 |  1,000,000 |       1,000 |       1,000 |       3 |      1 |  4.313 |     4.693 |   5.012 |  5.897 |  6.031 |     0.737 |        213.106 |          213,106 |
-| appendItems |      16 |  1,000,000 |      10,000 |      10,000 |       3 |      1 |  5.179 |     5.520 |   5.495 |  5.760 |  5.786 |     0.249 |        181.166 |        1,811,660 |
-| appendItems |      32 |  1,000,000 |         100 |         100 |       3 |      1 |  4.514 |     4.659 |   4.618 |  4.678 |  4.680 |     0.074 |        214.638 |           21,464 |
-| appendItems |      32 |  1,000,000 |       1,000 |       1,000 |       3 |      1 |  5.029 |     5.144 |   5.184 |  5.356 |  5.380 |     0.146 |        194.386 |          194,386 |
-| appendItems |      32 |  1,000,000 |      10,000 |      10,000 |       3 |      1 |  4.904 |     5.398 |   5.325 |  5.647 |  5.674 |     0.318 |        185.268 |        1,852,675 |
+| Operation | Columns | Base items | Added items | Plain median | Meta median | Meta overhead |
+| --------- | ------: | ---------: | ----------: | -----------: | ----------: | ------------: |
+| append    |       8 |  1,000,000 |       1,000 |     5.245 ms |    7.691 ms |        +46.6% |
+| append    |       8 |  1,000,000 |      10,000 |     6.520 ms |    9.741 ms |        +49.4% |
+| append    |      16 |  1,000,000 |       1,000 |     6.234 ms |    8.758 ms |        +40.5% |
+| append    |      16 |  1,000,000 |      10,000 |     7.942 ms |    8.961 ms |        +12.8% |
+| append    |      32 |  1,000,000 |       1,000 |     8.622 ms |   10.140 ms |        +17.6% |
+| append    |      32 |  1,000,000 |      10,000 |     8.626 ms |   12.560 ms |        +45.6% |
+| recreate  |       8 |    100,000 |           0 |     5.959 ms |   13.742 ms |       +130.6% |
+| recreate  |       8 |  1,000,000 |           0 |    60.395 ms |  130.015 ms |       +115.3% |
+| recreate  |      16 |    100,000 |           0 |    12.039 ms |   16.097 ms |        +33.7% |
+| recreate  |      16 |  1,000,000 |           0 |   108.444 ms |  152.910 ms |        +41.0% |
+| recreate  |      32 |    100,000 |           0 |    17.327 ms |   15.586 ms |        -10.1% |
+| recreate  |      32 |  1,000,000 |           0 |   158.391 ms |  172.211 ms |         +8.7% |
