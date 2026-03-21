@@ -1,3 +1,5 @@
+import type { SourceItem, WithMeta } from 'src/core/MatrixEngine';
+
 export interface MasonryMatrixState {
 	columnCount: number;
 	columnWidth: number;
@@ -6,4 +8,11 @@ export interface MasonryMatrixState {
 	workerCreated: boolean;
 	order: Uint32Array<ArrayBuffer>;
 	workerDisabled: boolean;
+}
+
+export interface RecreateOptions<T> {
+	items: readonly WithMeta<SourceItem, T>[];
+	rootWidth: number;
+	columnCount?: number;
+	gap?: number;
 }

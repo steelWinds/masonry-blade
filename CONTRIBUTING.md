@@ -105,7 +105,7 @@ Especially useful tests cover:
 - Invalid constructor arguments
 - Invalid item size handling
 - Append and recreate flows
-- Replay of remembered raw items after `recreateMatrix(...)`
+- Replay of remembered raw items after `recreate(...)`
 - Preservation of `columnCount` and `gap` after a successful recreate
 - `meta` passthrough
 - Readonly return shape guarantees
