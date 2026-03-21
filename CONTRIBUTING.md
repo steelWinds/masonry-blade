@@ -11,6 +11,7 @@ Please check:
 - Existing issues and pull requests
 - The current README and public API behavior
 - Whether your change is a bug fix, a test improvement, a documentation improvement, or a narrowly scoped feature
+- Check our PR or issue public templates
 
 For security issues, please do not open a public issue. See `SECURITY.md`.
 
