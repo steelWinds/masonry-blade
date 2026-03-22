@@ -19,8 +19,13 @@ export interface LayoutSnapshot<Return> {
 	readonly rootWidth: number;
 }
 
-export interface LayoutCalculationEngine<Return> {
+export interface LayoutCalculationEngine<
+	Return,
+	Snapshot extends LayoutSnapshot<Return>,
+	Unit extends Readonly<LayoutComputedUnit>,
+> {
 	append(arr: readonly Readonly<LayoutSourceUnit>[]): Return;
-	sort(source: Return): readonly Readonly<LayoutComputedUnit>[];
-	snapshot(): Readonly<LayoutSnapshot<Return>>;
+	sort(source: Return): readonly Readonly<Unit>[];
+	snapshot(): Readonly<Snapshot>;
+	fromSnapshot(snapshot: Snapshot): void;
 }

@@ -4,75 +4,11 @@ import type {
 	LayoutCalculationEngine,
 	LayoutComputedUnit,
 	LayoutSnapshot,
-	LayoutSourceUnit,
+	LayoutWorkerAdapter,
+	LayoutWorkerErrorResponse,
+	LayoutWorkerRequest,
+	LayoutWorkerSuccessResponse,
 } from '../contract';
-
-export type LayoutWorkerRequest<
-	Return,
-	Snapshot extends LayoutSnapshot<Return>,
-> =
-	| {
-			id: number;
-			type: 'append';
-			payload: {
-				snapshot: Readonly<Snapshot>;
-				items: readonly Readonly<LayoutSourceUnit>[];
-			};
-	  }
-	| {
-			id: number;
-			type: 'sort';
-			payload: {
-				snapshot: Readonly<Snapshot>;
-				source?: Return;
-			};
-	  };
-
-export type LayoutWorkerSuccessResponse<
-	Return,
-	Snapshot extends LayoutSnapshot<Return>,
-> =
-	| {
-			id: number;
-			ok: true;
-			type: 'append';
-			payload: {
-				result: Return;
-				snapshot: Readonly<Snapshot>;
-			};
-	  }
-	| {
-			id: number;
-			ok: true;
-			type: 'sort';
-			payload: {
-				items: readonly Readonly<LayoutComputedUnit>[];
-			};
-	  };
-
-export type LayoutWorkerErrorResponse = {
-	id: number;
-	ok: false;
-	type: 'append' | 'sort';
-	error: {
-		name: string;
-		message: string;
-		stack?: string;
-	};
-};
-
-export type LayoutWorkerResponse<
-	Return,
-	Snapshot extends LayoutSnapshot<Return>,
-> = LayoutWorkerSuccessResponse<Return, Snapshot> | LayoutWorkerErrorResponse;
-
-export interface LayoutWorkerAdapter<
-	Return,
-	Snapshot extends LayoutSnapshot<Return>,
-	Engine extends LayoutCalculationEngine<Return>,
-> {
-	restore(snapshot: Readonly<Snapshot>): Engine;
-}
 
 const toErrorPayload = (error: unknown): LayoutWorkerErrorResponse['error'] => {
 	if (error instanceof Error) {
@@ -92,9 +28,10 @@ const toErrorPayload = (error: unknown): LayoutWorkerErrorResponse['error'] => {
 export const bindLayoutWorker = <
 	Return,
 	Snapshot extends LayoutSnapshot<Return>,
-	Engine extends LayoutCalculationEngine<Return>,
+	Engine extends LayoutCalculationEngine<Return, Snapshot, Unit>,
+	Unit extends LayoutComputedUnit,
 >(
-	adapter: LayoutWorkerAdapter<Return, Snapshot, Engine>,
+	adapter: LayoutWorkerAdapter<Return, Snapshot, Engine, Unit>,
 ): void => {
 	self.onmessage = (
 		event: MessageEvent<LayoutWorkerRequest<Return, Snapshot>>,
@@ -105,18 +42,20 @@ export const bindLayoutWorker = <
 			switch (message.type) {
 				case 'append': {
 					const engine = adapter.restore(message.payload.snapshot);
-					const result = engine.append(message.payload.items);
+
+					engine.append(message.payload.items);
+
 					const snapshot = engine.snapshot() as Readonly<Snapshot>;
 
-					const response: LayoutWorkerSuccessResponse<Return, Snapshot> = {
-						id: message.id,
-						ok: true,
-						payload: {
-							result,
-							snapshot,
-						},
-						type: 'append',
-					};
+					const response: LayoutWorkerSuccessResponse<Return, Snapshot, Unit> =
+						{
+							id: message.id,
+							ok: true,
+							payload: {
+								snapshot,
+							},
+							type: 'append',
+						};
 
 					self.postMessage(response);
 					return;
@@ -128,14 +67,15 @@ export const bindLayoutWorker = <
 						message.payload.source ?? message.payload.snapshot.internalState;
 					const items = engine.sort(source);
 
-					const response: LayoutWorkerSuccessResponse<Return, Snapshot> = {
-						id: message.id,
-						ok: true,
-						payload: {
-							items,
-						},
-						type: 'sort',
-					};
+					const response: LayoutWorkerSuccessResponse<Return, Snapshot, Unit> =
+						{
+							id: message.id,
+							ok: true,
+							payload: {
+								items,
+							},
+							type: 'sort',
+						};
 
 					self.postMessage(response);
 					return;

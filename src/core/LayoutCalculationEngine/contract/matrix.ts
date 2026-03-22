@@ -12,9 +12,7 @@ export interface MatrixComputedUnit<T = undefined> extends LayoutComputedUnit {
 	readonly meta?: T;
 }
 
-export type ReadonlyMatrix<T = undefined> = readonly (readonly Readonly<
-	MatrixComputedUnit<T>
->[])[];
+export type ReadonlyMatrix<T = undefined> = Readonly<MatrixComputedUnit<T>>[][];
 
 export interface MatrixSnapshot<T> extends LayoutSnapshot<ReadonlyMatrix<T>> {
 	readonly columnHeights: Readonly<Float64Array>;

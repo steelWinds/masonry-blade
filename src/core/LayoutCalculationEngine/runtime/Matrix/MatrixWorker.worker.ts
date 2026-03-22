@@ -8,12 +8,6 @@ import {
 	bindLayoutWorker,
 } from 'src/core/LayoutCalculationEngine';
 
-type MatrixInternal<T = undefined> = {
-	_order: Uint32Array;
-	_columnHeights: Float64Array;
-	_matrix: MatrixComputedUnit<T>[][];
-};
-
 const restoreMatrixFromSnapshot = <T = undefined>(
 	snapshot: Readonly<MatrixSnapshot<T>>,
 ): Matrix<T> => {
@@ -23,13 +17,7 @@ const restoreMatrixFromSnapshot = <T = undefined>(
 		snapshot.gap,
 	);
 
-	const internal = matrix as unknown as MatrixInternal<T>;
-
-	internal._order = new Uint32Array(snapshot.order);
-	internal._columnHeights = new Float64Array(snapshot.columnHeights);
-	internal._matrix = Object.freeze(
-		snapshot.internalState,
-	) as MatrixComputedUnit<T>[][];
+	matrix.fromSnapshot(snapshot);
 
 	return matrix;
 };
@@ -37,7 +25,8 @@ const restoreMatrixFromSnapshot = <T = undefined>(
 bindLayoutWorker<
 	ReadonlyMatrix<unknown>,
 	MatrixSnapshot<unknown>,
-	Matrix<unknown>
+	Matrix<unknown>,
+	MatrixComputedUnit<unknown>
 >({
 	restore: restoreMatrixFromSnapshot,
 });

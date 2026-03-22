@@ -11,16 +11,18 @@ import { isPositiveFiniteNumber } from 'src/utils/IsFiniteNonZero';
 import { kWayMerge } from 'src/utils/kWayMerge';
 
 export class Matrix<T = undefined> implements LayoutCalculationEngine<
-	ReadonlyMatrix<T>
+	ReadonlyMatrix<T>,
+	MatrixSnapshot<T>,
+	MatrixComputedUnit<T>
 > {
-	private readonly _order: Uint32Array;
-	private readonly _columnHeights: Float64Array;
-	private readonly _matrix: MatrixComputedUnit<T>[][];
-	private readonly _rootWidth: number;
-	private readonly _realWidth: number;
-	private readonly _columnCount: number;
-	private readonly _columnWidth: number;
-	private readonly _gap: number;
+	private _order: Uint32Array;
+	private _columnHeights: Float64Array;
+	private _matrix: MatrixComputedUnit<T>[][];
+	private _rootWidth: number;
+	private _realWidth: number;
+	private _columnCount: number;
+	private _columnWidth: number;
+	private _gap: number;
 
 	constructor(rootWidth: number, columnCount: number, gap: number) {
 		this._validateLayout(rootWidth, columnCount, gap);
@@ -115,9 +117,7 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 			const x = shortest * (width + this._gap);
 
 			shortestColumn.push(
-				Object.freeze(
-					new MatrixUnit<T>(item.id, height, width, x, y, item.meta),
-				),
+				new MatrixUnit<T>(item.id, height, width, x, y, item.meta),
 			);
 
 			const newColumnHeight = y + height;
@@ -154,6 +154,19 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 			realWidth: this._realWidth,
 			rootWidth: this._rootWidth,
 		};
+	}
+
+	fromSnapshot(snapshot: MatrixSnapshot<T>): void {
+		this._rootWidth = snapshot.rootWidth;
+		this._realWidth = snapshot.realWidth;
+		this._columnCount = snapshot.columnCount;
+		this._columnWidth = snapshot.columnWidth;
+		this._order = new Uint32Array(snapshot.order);
+		this._columnHeights = new Float64Array(snapshot.columnHeights);
+		this._gap = snapshot.gap;
+		this._matrix = Object.freeze(
+			snapshot.internalState.map((column) => [...column]),
+		) as unknown as MatrixComputedUnit<T>[][];
 	}
 
 	sort(

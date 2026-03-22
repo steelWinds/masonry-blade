@@ -1,3 +1,4 @@
+import * as fc from 'fast-check';
 import {
 	MATRIX_ERRORS,
 	Matrix,
@@ -79,6 +80,104 @@ const serializeSnapshot = (snapshot: Readonly<MatrixSnapshot<TestMeta>>) => ({
 	realWidth: snapshot.realWidth,
 	rootWidth: snapshot.rootWidth,
 });
+
+const validIdArbitrary = fc.oneof(
+	fc.string({ minLength: 1 }),
+	fc.integer({
+		max: Number.MAX_SAFE_INTEGER,
+		min: Number.MIN_SAFE_INTEGER,
+	}),
+);
+
+const metaArbitrary: fc.Arbitrary<TestMeta | undefined> = fc.option(
+	fc.record(
+		{
+			label: fc.string(),
+			nested: fc.option(
+				fc.record({
+					version: fc.integer(),
+				}),
+				{ nil: undefined },
+			),
+		},
+		{
+			requiredKeys: ['label'],
+		},
+	),
+	{ nil: undefined },
+);
+
+const sourceUnitArbitrary: fc.Arbitrary<Readonly<MatrixSourceUnit<TestMeta>>> =
+	fc
+		.record({
+			height: fc.double({
+				max: 10_000,
+				min: Number.EPSILON,
+				noDefaultInfinity: true,
+				noNaN: true,
+			}),
+			id: validIdArbitrary,
+			meta: metaArbitrary,
+			width: fc.double({
+				max: 10_000,
+				min: Number.EPSILON,
+				noDefaultInfinity: true,
+				noNaN: true,
+			}),
+		})
+		.map((item) => item as Readonly<MatrixSourceUnit<TestMeta>>);
+
+const layoutConfigArbitrary = fc
+	.record({
+		columnCount: fc.integer({ max: 8, min: 1 }),
+		columnWidth: fc.integer({ max: 500, min: 1 }),
+		gap: fc.integer({ max: 32, min: 0 }),
+	})
+	.map(({ columnCount, columnWidth, gap }) => ({
+		columnCount,
+		columnWidth,
+		gap,
+		rootWidth: columnWidth * columnCount + gap * (columnCount - 1),
+	}));
+
+const chunkPlanArbitrary = fc.array(fc.integer({ max: 8, min: 1 }), {
+	maxLength: 12,
+	minLength: 1,
+});
+
+const splitByPlan = <T>(
+	items: readonly T[],
+	plan: readonly number[],
+): readonly (readonly T[])[] => {
+	const chunks: T[][] = [];
+	let cursor = 0;
+
+	for (const size of plan) {
+		if (cursor >= items.length) {
+			break;
+		}
+
+		chunks.push(items.slice(cursor, cursor + size));
+		cursor += size;
+	}
+
+	if (cursor < items.length) {
+		chunks.push(items.slice(cursor));
+	}
+
+	return chunks;
+};
+
+const getColumnHeight = (
+	column: readonly Readonly<MatrixComputedUnit<TestMeta>>[],
+): number => {
+	if (column.length === 0) {
+		return 0;
+	}
+
+	const last = column[column.length - 1];
+	return last.y + last.height;
+};
 
 describe('Matrix', () => {
 	beforeEach(() => {
@@ -166,6 +265,45 @@ describe('Matrix', () => {
 			expect(snapshot.realWidth).toBe(300);
 			expect(snapshot.columnWidth).toBe(150);
 			expect(snapshot.gap).toBe(0);
+		});
+
+		test('creates consistent empty state for arbitrary valid layout config', () => {
+			fc.assert(
+				fc.property(
+					layoutConfigArbitrary,
+					({ columnCount, columnWidth, gap, rootWidth }) => {
+						const matrix = new Matrix<TestMeta>(rootWidth, columnCount, gap);
+						const snapshot = matrix.snapshot();
+
+						expect(snapshot.columnCount).toBe(columnCount);
+						expect(snapshot.columnWidth).toBe(columnWidth);
+						expect(snapshot.gap).toBe(gap);
+						expect(snapshot.rootWidth).toBe(rootWidth);
+						expect(snapshot.realWidth).toBe(
+							rootWidth - gap * (columnCount - 1),
+						);
+
+						expect(snapshot.columnHeights).toBeInstanceOf(Float64Array);
+						expect(snapshot.order).toBeInstanceOf(Uint32Array);
+
+						expect(Array.from(snapshot.columnHeights)).toStrictEqual(
+							Array.from({ length: columnCount }, () => 0),
+						);
+						expect(Array.from(snapshot.order)).toStrictEqual(
+							Array.from({ length: columnCount }, (_, index) => index),
+						);
+						expect(snapshot.internalState).toHaveLength(columnCount);
+
+						for (const column of snapshot.internalState) {
+							expect(column).toStrictEqual([]);
+						}
+					},
+				),
+				{
+					numRuns: 200,
+					seed: FAKER_SEED,
+				},
+			);
 		});
 	});
 
@@ -447,6 +585,105 @@ describe('Matrix', () => {
 				serializeSnapshot(singleBatchMatrix.snapshot()),
 			);
 		});
+
+		test('preserves layout invariants for arbitrary valid batches', () => {
+			fc.assert(
+				fc.property(
+					layoutConfigArbitrary,
+					fc.array(sourceUnitArbitrary, { maxLength: 40 }),
+					({ columnCount, columnWidth, gap, rootWidth }, items) => {
+						const matrix = new Matrix<TestMeta>(rootWidth, columnCount, gap);
+
+						const result = matrix.append(items);
+						const snapshot = matrix.snapshot();
+
+						expect(result).toHaveLength(columnCount);
+						expect(snapshot.internalState).toHaveLength(columnCount);
+
+						const allUnits = snapshot.internalState.flat();
+						expect(allUnits).toHaveLength(items.length);
+
+						for (
+							let columnIndex = 0;
+							columnIndex < columnCount;
+							columnIndex++
+						) {
+							const column = snapshot.internalState[columnIndex];
+							const expectedX = columnIndex * (columnWidth + gap);
+
+							let expectedY = 0;
+
+							for (const unit of column) {
+								expect(unit.width).toBe(columnWidth);
+								expect(unit.x).toBe(expectedX);
+								expect(unit.y).toBeCloseTo(expectedY, 10);
+
+								expectedY = unit.y + unit.height + gap;
+							}
+
+							expect(snapshot.columnHeights[columnIndex]).toBeCloseTo(
+								getColumnHeight(column),
+								10,
+							);
+						}
+
+						const order = Array.from(snapshot.order);
+
+						expect(
+							[...order].sort((left, right) => left - right),
+						).toStrictEqual(
+							Array.from({ length: columnCount }, (_, index) => index),
+						);
+
+						for (let index = 1; index < order.length; index++) {
+							expect(
+								snapshot.columnHeights[order[index - 1]],
+							).toBeLessThanOrEqual(snapshot.columnHeights[order[index]]);
+						}
+					},
+				),
+				{
+					numRuns: 200,
+					seed: FAKER_SEED,
+				},
+			);
+		});
+
+		test('produces the same final layout for single-batch and incremental append for arbitrary inputs', () => {
+			fc.assert(
+				fc.property(
+					layoutConfigArbitrary,
+					fc.array(sourceUnitArbitrary, { maxLength: 40 }),
+					chunkPlanArbitrary,
+					({ columnCount, gap, rootWidth }, items, chunkPlan) => {
+						const singleBatchMatrix = new Matrix<TestMeta>(
+							rootWidth,
+							columnCount,
+							gap,
+						);
+						singleBatchMatrix.append(items);
+
+						const incrementalMatrix = new Matrix<TestMeta>(
+							rootWidth,
+							columnCount,
+							gap,
+						);
+
+						for (const chunk of splitByPlan(items, chunkPlan)) {
+							incrementalMatrix.append(chunk);
+						}
+
+						expect(
+							serializeSnapshot(incrementalMatrix.snapshot()),
+						).toStrictEqual(serializeSnapshot(singleBatchMatrix.snapshot()));
+					},
+				),
+				{
+					numRuns: 200,
+					seed: FAKER_SEED,
+				},
+			);
+		});
 	});
 
 	describe('public state mutability', () => {
@@ -491,7 +728,7 @@ describe('Matrix', () => {
 			expect(serializeSnapshot(matrix.snapshot())).toStrictEqual(expected);
 		});
 
-		test('returns fresh container arrays on each public read but safely reuses frozen unit references', () => {
+		test('returns fresh container arrays on each public read', () => {
 			const matrix = new Matrix<TestMeta>(320, 2, 20);
 
 			const appendResult = matrix.append([
@@ -515,50 +752,6 @@ describe('Matrix', () => {
 			expect(firstSnapshot.internalState[0][0]).toBe(
 				secondSnapshot.internalState[0][0],
 			);
-
-			expect(Object.isFrozen(appendResult[0][0])).toBe(true);
-		});
-
-		test('top-level MatrixUnit fields are runtime-immutable and cannot corrupt internal state', () => {
-			const matrix = new Matrix<TestMeta>(320, 2, 20);
-
-			matrix.append([createSourceUnit({ height: 100, id: 'a', width: 100 })]);
-
-			const snapshot = matrix.snapshot();
-			const [[unit]] = snapshot.internalState;
-			const expected = serializeSnapshot(matrix.snapshot());
-
-			expect(Object.isFrozen(unit)).toBe(true);
-
-			expect(Reflect.set(unit, '_id', 'mutated')).toBe(false);
-			expect(Reflect.set(unit, '_height', 1)).toBe(false);
-			expect(Reflect.set(unit, '_width', 2)).toBe(false);
-			expect(Reflect.set(unit, '_x', 3)).toBe(false);
-			expect(Reflect.set(unit, '_y', 4)).toBe(false);
-
-			expect(serializeSnapshot(matrix.snapshot())).toStrictEqual(expected);
-		});
-
-		test('nested meta objects are deeply frozen and cant leak mutations into internal state', () => {
-			const matrix = new Matrix<TestMeta>(320, 2, 20);
-
-			matrix.append([
-				createSourceUnit({
-					height: 100,
-					id: 'a',
-					meta: {
-						label: 'initial',
-						nested: { version: 1 },
-					},
-					width: 100,
-				}),
-			]);
-
-			const snapshot = matrix.snapshot();
-			const [[unit]] = snapshot.internalState;
-
-			expect(Object.isFrozen(unit)).toBe(true);
-			expect(Object.isFrozen(unit.meta)).toBe(true);
 		});
 
 		test('source meta object is kept by reference and external mutation after append dont allow', () => {
@@ -579,7 +772,6 @@ describe('Matrix', () => {
 			matrix.append([item]);
 
 			expect(Object.isFrozen(sharedMeta)).toBeTruthy();
-
 			expect(matrix.snapshot().internalState[0][0].meta).toBe(sharedMeta);
 		});
 	});
@@ -613,6 +805,147 @@ describe('Matrix', () => {
 			expect(compare({ x: 10, y: 1 }, { x: 20, y: 1 })).toBeLessThan(0);
 			expect(compare({ x: 30, y: 1 }, { x: 20, y: 1 })).toBeGreaterThan(0);
 			expect(compare({ x: 20, y: 1 }, { x: 20, y: 1 })).toBe(0);
+		});
+	});
+
+	describe('fromSnapshot', () => {
+		test('restores full state from snapshot', () => {
+			const source = new Matrix<TestMeta>(320, 2, 20);
+
+			source.append([
+				createSourceUnit({
+					height: 100,
+					id: 'a',
+					meta: { label: 'first' },
+					width: 100,
+				}),
+				createSourceUnit({
+					height: 200,
+					id: 'b',
+					meta: { label: 'second' },
+					width: 100,
+				}),
+				createSourceUnit({
+					height: 100,
+					id: 'c',
+					meta: { label: 'third' },
+					width: 200,
+				}),
+			]);
+
+			const snapshot = source.snapshot();
+
+			const restored = new Matrix<TestMeta>(1, 1, 0);
+			restored.fromSnapshot(snapshot);
+
+			expect(serializeSnapshot(restored.snapshot())).toStrictEqual(
+				serializeSnapshot(snapshot),
+			);
+		});
+
+		test('mutation of the passed snapshot after fromSnapshot does not affect restored state', () => {
+			const source = new Matrix<TestMeta>(320, 2, 20);
+
+			source.append([
+				createSourceUnit({
+					height: 100,
+					id: 'a',
+					meta: {
+						label: 'first',
+						nested: { version: 1 },
+					},
+					width: 100,
+				}),
+				createSourceUnit({
+					height: 200,
+					id: 'b',
+					meta: { label: 'second' },
+					width: 100,
+				}),
+			]);
+
+			const snapshot = source.snapshot();
+
+			const restored = new Matrix<TestMeta>(1, 1, 0);
+			restored.fromSnapshot(snapshot);
+
+			const expected = serializeSnapshot(restored.snapshot());
+			const mutableSnapshot = snapshot as MatrixSnapshot<TestMeta> & {
+				internalState: MatrixComputedUnit<TestMeta>[][];
+			};
+
+			// @ts-expect-error
+			mutableSnapshot.rootWidth = 999;
+			// @ts-expect-error
+			mutableSnapshot.realWidth = 888;
+			// @ts-expect-error
+			mutableSnapshot.columnCount = 777;
+			// @ts-expect-error
+			mutableSnapshot.columnWidth = 666;
+			// @ts-expect-error
+			mutableSnapshot.gap = 555;
+
+			// @ts-expect-error
+			mutableSnapshot.order[0] = 123;
+			// @ts-expect-error
+			mutableSnapshot.columnHeights[0] = 456;
+
+			mutableSnapshot.internalState.push([]);
+			mutableSnapshot.internalState[0].length = 0;
+
+			expect(serializeSnapshot(restored.snapshot())).toStrictEqual(expected);
+		});
+
+		test('continues layout identically after restoring from snapshot', () => {
+			const initialItems = [
+				createSourceUnit({ height: 100, id: 'a', width: 100 }),
+				createSourceUnit({ height: 150, id: 'b', width: 100 }),
+				createSourceUnit({ height: 120, id: 'c', width: 200 }),
+			] as const;
+
+			const nextItems = [
+				createSourceUnit({ height: 180, id: 'd', width: 120 }),
+				createSourceUnit({ height: 90, id: 'e', width: 100 }),
+			] as const;
+
+			const source = new Matrix<TestMeta>(500, 3, 10);
+			source.append(initialItems);
+
+			const restored = new Matrix<TestMeta>(1, 1, 0);
+			restored.fromSnapshot(source.snapshot());
+
+			source.append(nextItems);
+			restored.append(nextItems);
+
+			expect(serializeSnapshot(restored.snapshot())).toStrictEqual(
+				serializeSnapshot(source.snapshot()),
+			);
+		});
+
+		test('restores equivalent state from snapshot for arbitrary valid inputs', () => {
+			fc.assert(
+				fc.property(
+					layoutConfigArbitrary,
+					fc.array(sourceUnitArbitrary, { maxLength: 40 }),
+					({ columnCount, gap, rootWidth }, items) => {
+						const source = new Matrix<TestMeta>(rootWidth, columnCount, gap);
+						source.append(items);
+
+						const snapshot = source.snapshot();
+
+						const restored = new Matrix<TestMeta>(1, 1, 0);
+						restored.fromSnapshot(snapshot);
+
+						expect(serializeSnapshot(restored.snapshot())).toStrictEqual(
+							serializeSnapshot(snapshot),
+						);
+					},
+				),
+				{
+					numRuns: 200,
+					seed: FAKER_SEED,
+				},
+			);
 		});
 	});
 });
