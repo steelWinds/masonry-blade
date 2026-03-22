@@ -1,8 +1,4 @@
+export * from './core/Engine';
 export * from './facade/MasonryMatrix';
-export * from './core/MatrixEngine/errors';
-export type {
-	MatrixItem,
-	SourceItem,
-	Meta,
-	WithMeta,
-} from './core/MatrixEngine/contract';
+export * from './core/Engine/errors';
+export type { SourceItem } from './core/Engine/contract';

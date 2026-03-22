@@ -1,2 +1,2 @@
-export const isPositiveFiniteNumber = (num: number) =>
-	Number.isFinite(num) && num > 0;
+export const isPositiveFiniteNumber = (value: number) =>
+	Number.isFinite(value) && value > 0;

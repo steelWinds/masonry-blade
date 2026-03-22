@@ -1,0 +1,26 @@
+export interface LayoutSourceUnit {
+	readonly id: string | number;
+	readonly width: number;
+	readonly height: number;
+}
+
+export interface LayoutComputedUnit {
+	readonly id: string | number;
+	readonly width: number;
+	readonly height: number;
+	readonly x: number;
+	readonly y: number;
+}
+
+export interface LayoutSnapshot<Return> {
+	readonly columnCount: number;
+	readonly gap: number;
+	readonly internalState: Return;
+	readonly rootWidth: number;
+}
+
+export interface LayoutCalculationEngine<Return> {
+	append(arr: readonly Readonly<LayoutSourceUnit>[]): Return;
+	sort(source: Return): readonly Readonly<LayoutComputedUnit>[];
+	snapshot(): Readonly<LayoutSnapshot<Return>>;
+}
