@@ -1,3 +1,5 @@
+type MaybePromise<T> = T | Promise<T>;
+
 export interface LayoutSourceUnit {
 	readonly id: string | number;
 	readonly width: number;
@@ -24,8 +26,8 @@ export interface LayoutCalculationEngine<
 	Snapshot extends LayoutSnapshot<Return>,
 	Unit extends Readonly<LayoutComputedUnit>,
 > {
-	append(arr: readonly Readonly<LayoutSourceUnit>[]): Return;
-	sort(source: Return): readonly Readonly<Unit>[];
+	append(arr: readonly Readonly<LayoutSourceUnit>[]): MaybePromise<Return>;
+	sort(source: Return): MaybePromise<readonly Readonly<Unit>[]>;
 	snapshot(): Readonly<Snapshot>;
 	fromSnapshot(snapshot: Snapshot): void;
 }

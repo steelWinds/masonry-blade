@@ -49,6 +49,7 @@ The following are usually out of scope unless they create a real security impact
 - Normal validation failures for invalid input
 - Rendering differences between environments
 - Errors caused by non-cloneable `meta` values in worker mode
+- API misunderstandings around `recreate({ ... })` with omitted `items`
 - Documentation bugs, API ergonomics issues, or feature requests
 - Environment-specific worker setup problems without a security consequence
 

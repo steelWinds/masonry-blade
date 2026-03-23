@@ -11,10 +11,10 @@ export class WebWorker<
 	Return,
 	Snapshot extends LayoutSnapshot<Return>,
 	Unit extends LayoutComputedUnit,
-> {
-	private readonly _engine: LayoutCalculationEngine<Return, Snapshot, Unit>;
+> implements LayoutCalculationEngine<Return, Snapshot, Unit> {
 	private readonly _path: string;
 
+	private _engine: LayoutCalculationEngine<Return, Snapshot, Unit>;
 	private _worker?: Worker;
 	private _pendingReject?: (reason?: unknown) => void;
 	private _workerDisabled = false;
@@ -163,7 +163,15 @@ export class WebWorker<
 		this._ensureWorker();
 	}
 
-	public async append(arr: readonly LayoutSourceUnit[]): Promise<Snapshot> {
+	public get workerCreated(): boolean {
+		return this._worker != null;
+	}
+
+	public get workerDisabled(): boolean {
+		return this._workerDisabled;
+	}
+
+	public async append(arr: readonly Readonly<LayoutSourceUnit>[]) {
 		this._ensureWorker();
 
 		if (this._worker == null) {
@@ -192,7 +200,7 @@ export class WebWorker<
 		}
 	}
 
-	public async sort(source: Return): Promise<readonly Unit[]> {
+	public async sort(source: Return): Promise<readonly Readonly<Unit>[]> {
 		this._ensureWorker();
 
 		if (this._worker == null) {
@@ -218,5 +226,13 @@ export class WebWorker<
 
 	public snapshot(): Snapshot {
 		return this._engine.snapshot();
+	}
+
+	public fromSnapshot(snapshot: Snapshot): void {
+		this._engine.fromSnapshot(snapshot);
+	}
+
+	public setEngine(engine: LayoutCalculationEngine<Return, Snapshot, Unit>) {
+		this._engine = engine;
 	}
 }

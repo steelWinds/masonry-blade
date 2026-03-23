@@ -18,7 +18,7 @@ For security issues, please do not open a public issue. See `SECURITY.md`.
 
 ### Requirements
 
-- Node.js `>=20.19.0`
+- Node.js `>=22.18.0`
 - `pnpm`
 
 ### Install
@@ -56,7 +56,7 @@ It is:
 
 - A masonry layout engine
 - Framework-agnostic
-- Focused on source sizes, coordinates, and replayable layout state
+- Focused on source sizes, coordinates, and explicit rebuild inputs
 - Designed around a single public runtime facade: `MasonryMatrix`
 
 It is not:
@@ -94,7 +94,7 @@ Avoid changes that:
 - Add implicit or hard-to-explain behavior
 - Make internal state harder to reason about
 - Couple the project to a specific framework or rendering strategy
-- Weaken guarantees around deterministic output, replayed state, or worker fallback
+- Weaken guarantees around deterministic output, explicit rebuild behavior, or worker fallback
 
 ### Add tests for behavior changes
 
@@ -105,7 +105,7 @@ Especially useful tests cover:
 - Invalid constructor arguments
 - Invalid item size handling
 - Append and recreate flows
-- Replay of remembered raw items after `recreate(...)`
+- `recreate({ ... })` with and without explicit `items`
 - Preservation of `columnCount` and `gap` after a successful recreate
 - `meta` passthrough
 - Readonly return shape guarantees
@@ -113,7 +113,6 @@ Especially useful tests cover:
 - `enableWorker()`, `disableWorker()`, and `terminateWorker()` behavior
 - Serialization and structured-clone expectations in worker mode
 - Empty-state and zero-item edge cases
-- Non-concurrent call expectations on a single instance
 - Snapshot integrity of internal state returned by `getState()`
 
 ### Be careful with performance claims
@@ -199,7 +198,7 @@ When proposing a feature, explain:
 - The problem
 - Why the current API is not enough
 - The smallest useful addition
-- Whether the feature affects worker mode, replayed state, return shapes, or determinism
+- Whether the feature affects worker mode, `recreate({ ... })` semantics, return shapes, or determinism
 
 ## Documentation contributions
 

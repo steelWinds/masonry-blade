@@ -33,9 +33,9 @@ export const bindLayoutWorker = <
 >(
 	adapter: LayoutWorkerAdapter<Return, Snapshot, Engine, Unit>,
 ): void => {
-	self.onmessage = (
+	self.onmessage = async (
 		event: MessageEvent<LayoutWorkerRequest<Return, Snapshot>>,
-	): void => {
+	): Promise<void> => {
 		const message = event.data;
 
 		try {
@@ -65,7 +65,7 @@ export const bindLayoutWorker = <
 					const engine = adapter.restore(message.payload.snapshot);
 					const source =
 						message.payload.source ?? message.payload.snapshot.internalState;
-					const items = engine.sort(source);
+					const items = await engine.sort(source);
 
 					const response: LayoutWorkerSuccessResponse<Return, Snapshot, Unit> =
 						{

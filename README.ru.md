@@ -24,7 +24,7 @@
 - **🎨 Не привязан к UI.** Подходит для `React`, `Vue`, `Svelte`, `Canvas` и `Vanilla JS`.
 - **🏷️ Поддерживает метаданные.** В элементах сетки могут быть любые дополнительные данные для их последующей отрисовки.
 - **💤 Поддерживает lazy-load.** Добавляй элементы порциями без потери текущей раскладки.
-- **🔄 Умеет пересобирать матрицу.** Уже принятые элементы можно переразложить под новую ширину, число колонок и `gap`.
+- **🔄 Умеет пересобирать матрицу.** Раскладку можно пересчитать под новую ширину, число колонок и `gap` из явно переданного батча элементов.
 - **🧵 Умеет работать через `Web Worker`.** А при его отсутствии или отключении спокойно считает синхронно.
 
 > Вы даёте ему исходные размеры элементов, а он возвращает готовые `x`, `y`, `width`, `height` для рендера в любом UI. Без DOM, без привязки к фреймворку и без раздутого API.
@@ -49,28 +49,23 @@ pnpm add masonry-blade
 
 - `MasonryMatrix` - основной runtime-фасад
 - `MasonryMatrixError` и `MASONRY_MATRIX_ERROR_MESSAGES` - ошибки и константы фасада
-- `MatrixEngineError` и `MATRIX_ENGINE_ERRORS` - низкоуровневые ошибки и константы движка
-- TypeScript-контракты: `Meta`, `SourceItem`, `MatrixItem`, `WithMeta`, `MasonryMatrixState`
+- TypeScript-контракты: `MasonryMatrixState` и `RecreateOptions`
+- Сабпуть пакета: `masonry-blade/matrixWorker` - worker entry для ручной интеграции при необходимости
 
 ```ts
 import {
 	MasonryMatrix,
 	MasonryMatrixError,
 	MASONRY_MATRIX_ERROR_MESSAGES,
-	MatrixEngineError,
-	MATRIX_ENGINE_ERRORS,
-	type MatrixItem,
 	type MasonryMatrixState,
-	type Meta,
-	type SourceItem,
-	type WithMeta,
+	type RecreateOptions,
 } from 'masonry-blade';
 ```
 
 ### Конструктор
 
 ```ts
-new MasonryMatrix<TMeta = never>(rootWidth: number, columnCount = 1, gap = 0)
+new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount = 1, gap = 0)
 ```
 
 - `rootWidth` - ширина контейнера
@@ -86,12 +81,17 @@ await matrix.append(items);
 Добавляет новую пачку элементов в текущую матрицу и возвращает колонки.
 
 ```ts
-await matrix.recreate(rootWidth, columnCount?, gap?)
+await matrix.recreate({
+	rootWidth,
+	columnCount?,
+	gap?,
+	items?,
+})
 ```
 
-Пересобирает матрицу с нуля по **всем ранее принятым элементам**, которые экземпляр сохранил внутри.
-Элементы, отфильтрованные во время `append()`, не накапливаются и позже не участвуют в пересборке.
-Если `columnCount` и `gap` не переданы, используются последние сохранённые значения. Сначала это значения из конструктора, потом - значения последнего успешного `recreate(...)`.
+Пересобирает матрицу с нуля только по `items`, переданным в `options`.
+Если `items` не переданы, матрица пересобирается как пустая раскладка.
+Если `columnCount` и `gap` не переданы, используются последние успешные значения. Сначала это значения из конструктора, потом - значения последнего успешного `recreate(...)`.
 
 ```ts
 matrix.terminateWorker();
@@ -120,7 +120,7 @@ const state = matrix.getState();
 
 ## Какие данные ждёт библиотека
 
-Во входных элементах используется экспортируемый контракт `SourceItem`:
+Во входных элементах ожидаются обычные объекты такой формы:
 
 ```ts
 type SourceItem = {
@@ -130,7 +130,7 @@ type SourceItem = {
 };
 ```
 
-На выходе используются элементы с экспортируемым контрактом `MatrixItem`:
+На выходе возвращаются обычные объекты такой формы:
 
 ```ts
 type MatrixItem = {
@@ -141,7 +141,14 @@ type MatrixItem = {
   y: number;
 };
 
-readonly (readonly WithMeta<MatrixItem, TMeta>[])[]
+readonly (readonly {
+  id: string | number;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  meta?: TMeta;
+}[])[]
 ```
 
 Если вы создаёте `new MasonryMatrix<TMeta>(...)`, каждый входной элемент должен содержать `meta: TMeta`, и каждый выходной элемент сохранит это же `meta`.
@@ -173,7 +180,7 @@ console.log(columns);
 1. Сначала считается ширина колонки:
 
 ```ts
-columnWidth = Math.max(0, (rootWidth - gap * (columnCount - 1)) / columnCount);
+columnWidth = (rootWidth - gap * (columnCount - 1)) / columnCount;
 ```
 
 2. Высота элемента масштабируется по исходному соотношению сторон.
@@ -293,7 +300,7 @@ main();
 
 ## Пример: пересборка при resize
 
-`recreate()` берёт все уже принятые элементы и заново считает сетку.
+`recreate()` заново считает сетку по явно переданному списку элементов.
 
 ```js
 import { MasonryMatrix } from 'masonry-blade';
@@ -368,7 +375,11 @@ async function main() {
 		const width = container.clientWidth;
 		const columns = width < 768 ? 2 : width < 1200 ? 3 : 4;
 
-		const rebuilt = await matrix.recreate(width, columns);
+		const rebuilt = await matrix.recreate({
+			rootWidth: width,
+			columnCount: columns,
+			items: initialItems,
+		});
 
 		render(rebuilt);
 	});
@@ -377,7 +388,7 @@ async function main() {
 main();
 ```
 
-Если вызвать только `recreate(newWidth)`, библиотека **не сбрасывает** сетку к `1` колонке и `gap = 0`. Она использует последние сохранённые `columnCount` и `gap`.
+Если вызвать только `recreate({ rootWidth: newWidth })`, библиотека использует последние успешные `columnCount` и `gap`, но так как `items` не переданы, пересобранная раскладка будет пустой.
 
 ## Пример: управление `Worker`
 
@@ -394,7 +405,10 @@ columns = await matrix.append([{ id: 1, width: 1, height: 1 }]); // гарант
 
 matrix.enableWorker();
 
-columns = await matrix.recreate(1200); // библиотека снова пытается использовать Worker
+columns = await matrix.recreate({
+	rootWidth: 1200,
+	items: [{ id: 1, width: 1, height: 1 }],
+}); // библиотека снова пытается использовать Worker
 
 console.log(columns);
 ```
@@ -403,17 +417,13 @@ console.log(columns);
 
 ### Мутация выходных данных:
 
-- Не мутируйте возвращённые колонки и элементы из `append()` и `recreate()`. Библиотека держит внутреннее состояние в этих же структурах. Если нужен безопасный снимок служебного состояния, используйте `getState()`.
-- Не мутируйте входные элементы после передачи в `append()`. Принятые raw items сохраняются внутри и потом используются в `recreate()`. Считайте переданные элементы и вложенные значения `meta` неизменяемыми независимо от того, шёл расчёт синхронно или через `Worker`.
-- В worker-режиме payload для воркера проходит через structured clone, но raw items, сохранённые внутри экземпляра, всё равно остаются исходными принятыми объектами.
+- Считайте возвращённую раскладку read-only. Контейнерные массивы безопасны для чтения, но мутация самих item-объектов не входит в публичный контракт.
+- Считайте входные элементы неизменяемыми, пока выполняется вызов.
+- В worker-режиме payload проходит через structured clone, поэтому значения в `meta` тоже должны быть cloneable.
 
 ### Работа с невалидными объектами:
 
-- `append()` молча пропускает элементы, у которых `width` или `height` не является положительным конечным числом. Такие элементы не попадают в текущую раскладку и не накапливаются для будущих вызовов `recreate()`.
-
-### Конкурентность:
-
-- Один экземпляр `MasonryMatrix` не принимает конкурентные вызовы. Сначала `await`, потом следующий вызов.
+- `append()` и `recreate({ items })` молча пропускают элементы, у которых невалидный `id`, либо `width` или `height` не являются положительными конечными числами.
 
 ### Работа с Web-Worker:
 
@@ -430,7 +440,7 @@ console.log(columns);
 
 - У библиотеки нет API для удаления, обновления или точечной перестановки отдельных элементов.
 - Библиотека не работает с DOM сама. Измерение контейнера, выбор breakpoints и рендер - на вашей стороне.
-- Если `gap` съест всю ширину контейнера, ширина колонки станет `0`, а не уйдёт в отрицательные значения.
+- `recreate()` не переиспользует предыдущие батчи из `append()` автоматически. Если нужна пересборка по исходным данным, передавайте `items` явно.
 
 ## Ошибки и валидация
 
@@ -438,24 +448,22 @@ console.log(columns);
 
 Невалидные параметры матрицы:
 
-- `rootWidth < 0` или `rootWidth` не является конечным числом
+- `rootWidth <= 0` или `rootWidth` не является конечным числом
 - `columnCount <= 0` или `columnCount` не является целым числом
 - `gap < 0` или `gap` не является конечным числом
+- `gap` не оставляет положительного места под колонки
 
-Невалидные элементы в `append()` не выбрасывают ошибку, а пропускаются. Элемент пропускается, если его `width` или `height` не является положительным конечным числом.
-Пропущенные элементы не попадают в текущую раскладку и не сохраняются для будущих вызовов `recreate()`.
+Невалидные элементы в `append()` или `recreate({ items })` не выбрасывают ошибку, а пропускаются. Элемент пропускается, если у него невалидный `id`, либо `width` или `height` не являются положительными конечными числами.
 
-Ошибки верхнего уровня приходят как `MasonryMatrixError`. Внутри `cause` может лежать исходная причина, в том числе ошибка `Worker`, ошибка structured clone / `postMessage(...)` или ошибка валидации движка. Ошибка отправки payload в `Worker` обычно приходит как исходная причина внутри цепочки `cause`, обёрнутой сообщением `Failed to update internal state`.
+Ошибки верхнего уровня приходят как `MasonryMatrixError`. Внутри `cause` может лежать исходная причина, в том числе ошибка `Worker`, ошибка structured clone / `postMessage(...)` или ошибка валидации движка.
 
 Типичные сообщения верхнего уровня:
 
 - `Failed to append items to the matrix`
 - `Failed to recreate the matrix`
-- `Concurrent call is not allowed`
 
 Типичные внутренние причины в `cause`:
 
-- `Failed to update internal state`
 - `Failed to receive a message from the worker`
 - `Worker execution failed`
 - `Worker was terminated`
