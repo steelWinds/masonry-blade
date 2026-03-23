@@ -1,5 +1,7 @@
 # masonry-blade
 
+> Created in honor of _Anna Stefu_ — my greatest love 🦇💜
+
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 [![Module type: ESM](https://img.shields.io/badge/module%20type-esm-brightgreen)](https://github.com/voxpelli/badges-cjs-esm)
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
