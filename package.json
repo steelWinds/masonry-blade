@@ -1,6 +1,6 @@
 {
 	"name": "masonry-blade",
-	"version": "1.2.0",
+	"version": "2.0.0",
 	"private": false,
 	"description": "masonry-blade is a small and fast zero-dependencies engine for masonry layout calculation.",
 	"keywords": [
