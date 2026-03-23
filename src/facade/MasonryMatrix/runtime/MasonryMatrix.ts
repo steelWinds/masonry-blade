@@ -78,6 +78,20 @@ export class MasonryMatrix<T = undefined> {
 		}
 	}
 
+	public async sort(
+		source: ReadonlyMatrix<T>,
+	): Promise<readonly Readonly<MatrixComputedUnit<T>>[]> {
+		try {
+			const sorted = await this._engine.sort(source);
+
+			return sorted;
+		} catch (error: unknown) {
+			throw new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.SORT_MATRIX, {
+				cause: error,
+			});
+		}
+	}
+
 	public async recreate(
 		options: RecreateOptions<T>,
 	): Promise<Readonly<ReadonlyMatrix<T>>> {

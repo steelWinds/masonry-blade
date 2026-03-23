@@ -47,6 +47,17 @@ class FakeWorker {
 		} as MessageEvent<unknown>);
 	}
 
+	public emitSort(items: readonly unknown[]): void {
+		this.onmessage?.({
+			data: {
+				payload: {
+					items,
+				},
+				type: 'sort',
+			},
+		} as MessageEvent<unknown>);
+	}
+
 	public emitMessageError(): void {
 		this.onmessageerror?.({} as MessageEvent<unknown>);
 	}
@@ -148,6 +159,22 @@ describe('MasonryMatrix', () => {
 		});
 	});
 
+	test('sort() falls back to sync mode, returns flat items, and does not mutate state', async () => {
+		vi.stubGlobal('Worker', undefined);
+
+		const matrix = new MasonryMatrix<TestMeta>(320, 2, 20);
+		const expectedMatrix = new Matrix<TestMeta>(320, 2, 20);
+
+		const layout = await matrix.append(INITIAL_ITEMS);
+		const previousState = matrix.getState();
+
+		const expectedLayout = expectedMatrix.append(INITIAL_ITEMS);
+		const result = await matrix.sort(layout);
+
+		expect(result).toStrictEqual(expectedMatrix.sort(expectedLayout));
+		expect(matrix.getState()).toStrictEqual(previousState);
+	});
+
 	test('recreate() uses only explicitly passed items and reuses previous columnCount/gap when omitted', async () => {
 		vi.stubGlobal('Worker', undefined);
 
@@ -231,6 +258,47 @@ describe('MasonryMatrix', () => {
 		});
 	});
 
+	test('sort() uses worker payloads after enableWorker() and keeps the current state intact', async () => {
+		vi.stubGlobal('Worker', FakeWorker as unknown as typeof Worker);
+
+		const matrix = new MasonryMatrix<TestMeta>(400, 2, 10);
+		const expectedMatrix = new Matrix<TestMeta>(400, 2, 10);
+		const layout = expectedMatrix.append(INITIAL_ITEMS);
+		const expectedSnapshot = expectedMatrix.snapshot();
+		const expectedSorted = expectedMatrix.sort(layout);
+
+		matrix.disableWorker();
+		const source = await matrix.append(INITIAL_ITEMS);
+		matrix.enableWorker();
+
+		const pending = matrix.sort(source);
+
+		expect(FakeWorker.instances).toHaveLength(1);
+
+		const [worker] = FakeWorker.instances;
+
+		expect(worker.postMessage).toHaveBeenCalledWith({
+			payload: {
+				snapshot: expectedSnapshot,
+				source,
+			},
+			type: 'sort',
+		});
+
+		worker.emitSort(expectedSorted);
+
+		await expect(pending).resolves.toStrictEqual(expectedSorted);
+		expect(matrix.getState()).toStrictEqual({
+			columnCount: expectedSnapshot.columnCount,
+			columnWidth: expectedSnapshot.columnWidth,
+			columnsHeights: new Float64Array(expectedSnapshot.columnHeights),
+			gap: expectedSnapshot.gap,
+			order: new Uint32Array(expectedSnapshot.order),
+			workerCreated: true,
+			workerDisabled: false,
+		});
+	});
+
 	test('terminateWorker() rejects an in-flight append and wraps the worker error with APPEND_ITEMS', async () => {
 		vi.stubGlobal('Worker', FakeWorker as unknown as typeof Worker);
 
@@ -245,6 +313,33 @@ describe('MasonryMatrix', () => {
 		await expect(pending).rejects.toMatchObject({
 			message: MASONRY_MATRIX_ERROR_MESSAGES.APPEND_ITEMS,
 			name: 'MasonryMatrixError',
+		});
+	});
+
+	test('sort() wraps worker failures with SORT_MATRIX and keeps the matrix state', async () => {
+		vi.stubGlobal('Worker', FakeWorker as unknown as typeof Worker);
+
+		const matrix = new MasonryMatrix<TestMeta>(320, 2, 20);
+
+		matrix.disableWorker();
+		const source = await matrix.append(INITIAL_ITEMS);
+		matrix.enableWorker();
+
+		const stateBeforeSort = matrix.getState();
+		const pending = matrix.sort(source);
+
+		const [worker] = FakeWorker.instances;
+		worker.emitMessageError();
+
+		await expect(pending).rejects.toMatchObject({
+			message: MASONRY_MATRIX_ERROR_MESSAGES.SORT_MATRIX,
+			name: 'MasonryMatrixError',
+		});
+
+		expect(matrix.getState()).toStrictEqual({
+			...stateBeforeSort,
+			workerCreated: false,
+			workerDisabled: false,
 		});
 	});
 

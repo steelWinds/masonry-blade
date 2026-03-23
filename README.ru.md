@@ -45,18 +45,20 @@ pnpm add masonry-blade
 
 ## Публичное API
 
-Пакет экспортирует:
+У пакета только одна публичная точка входа: `masonry-blade`.
+
+Из неё экспортируются:
 
 - `MasonryMatrix` - основной runtime-фасад
 - `MasonryMatrixError` и `MASONRY_MATRIX_ERROR_MESSAGES` - ошибки и константы фасада
-- TypeScript-контракты: `MasonryMatrixState` и `RecreateOptions`
-- Сабпуть пакета: `masonry-blade/matrixWorker` - worker entry для ручной интеграции при необходимости
+- TypeScript-контракты: `MasonryMatrixErrorMessage`, `MasonryMatrixState` и `RecreateOptions`
 
 ```ts
 import {
 	MasonryMatrix,
 	MasonryMatrixError,
 	MASONRY_MATRIX_ERROR_MESSAGES,
+	type MasonryMatrixErrorMessage,
 	type MasonryMatrixState,
 	type RecreateOptions,
 } from 'masonry-blade';
@@ -65,12 +67,14 @@ import {
 ### Конструктор
 
 ```ts
-new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount = 1, gap = 0)
+new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount: number, gap: number)
 ```
 
 - `rootWidth` - ширина контейнера
 - `columnCount` - число колонок
 - `gap` - расстояние между колонками по горизонтали и между элементами по вертикали
+
+Все три аргумента конструктора обязательны.
 
 ### Методы
 
@@ -79,6 +83,13 @@ await matrix.append(items);
 ```
 
 Добавляет новую пачку элементов в текущую матрицу и возвращает колонки.
+
+```ts
+await matrix.sort(source);
+```
+
+Преобразует matrix-source в один плоский массив, отсортированный по визуальному порядку: сначала по `y`, затем по `x`.
+Матрицу заново не пересобирает и текущее состояние фасада не мутирует.
 
 ```ts
 await matrix.recreate({
@@ -123,35 +134,41 @@ const state = matrix.getState();
 Во входных элементах ожидаются обычные объекты такой формы:
 
 ```ts
-type SourceItem = {
+{
 	id: string | number;
 	width: number;
 	height: number;
-};
+	meta?: TMeta;
+}
 ```
 
-На выходе возвращаются обычные объекты такой формы:
+`append()` и `recreate()` возвращают матрицу такой формы:
 
 ```ts
-type MatrixItem = {
-  id: string | number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-};
-
 readonly (readonly {
-  id: string | number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-  meta?: TMeta;
+	id: string | number;
+	width: number;
+	height: number;
+	x: number;
+	y: number;
+	meta?: TMeta;
 }[])[]
 ```
 
-Если вы создаёте `new MasonryMatrix<TMeta>(...)`, каждый входной элемент должен содержать `meta: TMeta`, и каждый выходной элемент сохранит это же `meta`.
+`sort()` возвращает плоский список такой формы:
+
+```ts
+readonly Readonly<{
+	id: string | number;
+	width: number;
+	height: number;
+	x: number;
+	y: number;
+	meta?: TMeta;
+}>[]
+```
+
+Если вы создаёте `new MasonryMatrix<TMeta>(...)`, любое переданное `meta` будет типизировано как `TMeta`, а выходные элементы сохранят то же `meta`.
 
 Важно: `width` и `height` на выходе уже пересчитаны под ширину колонки. Это не исходные размеры.
 
@@ -168,10 +185,12 @@ const columns = await matrix.append([
 	{ id: '3', width: 1000, height: 1000 },
 ]);
 
-console.log(columns);
+const items = await matrix.sort(columns);
+
+console.log(items);
 ```
 
-`append()` и `recreate()` всегда асинхронные. Даже если `Worker` не используется, вы всё равно работаете через `await`.
+`append()`, `sort()` и `recreate()` всегда асинхронные. Даже если `Worker` не используется, вы всё равно работаете через `await`.
 
 ## Как это работает
 
@@ -192,7 +211,7 @@ columnWidth = (rootWidth - gap * (columnCount - 1)) / columnCount;
 ## Пример с `meta`
 
 `meta` не участвует в расчётах, но проходит через всю матрицу вместе с элементом.
-Если вы создаёте `MasonryMatrix<TMeta>`, каждый элемент в `append(...)` должен передавать `meta: TMeta`.
+Если вы создаёте `MasonryMatrix<TMeta>`, любое переданное `meta` будет типизировано как `TMeta`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -219,6 +238,26 @@ const columns = await matrix.append([
 ]);
 
 console.log(columns[0][0].meta.src);
+```
+
+## Пример: получить плоский порядок для рендера
+
+`append()` и `recreate()` возвращают колонки. Если нужен один плоский список для рендера сверху вниз и затем слева направо, вызывайте `sort(...)`.
+
+```ts
+import { MasonryMatrix } from 'masonry-blade';
+
+const matrix = new MasonryMatrix(1200, 3, 16);
+
+const columns = await matrix.append([
+	{ id: '1', width: 1600, height: 900 },
+	{ id: '2', width: 800, height: 1200 },
+	{ id: '3', width: 1000, height: 1000 },
+]);
+
+const orderedItems = await matrix.sort(columns);
+
+console.log(orderedItems.map((item) => item.id));
 ```
 
 ## Пример с координатами
@@ -420,6 +459,7 @@ console.log(columns);
 - Считайте возвращённую раскладку read-only. Контейнерные массивы безопасны для чтения, но мутация самих item-объектов не входит в публичный контракт.
 - Считайте входные элементы неизменяемыми, пока выполняется вызов.
 - В worker-режиме payload проходит через structured clone, поэтому значения в `meta` тоже должны быть cloneable.
+- `sort()` читает только переданный `source` и не модифицирует сохранённое состояние матрицы.
 
 ### Работа с невалидными объектами:
 
@@ -460,6 +500,7 @@ console.log(columns);
 Типичные сообщения верхнего уровня:
 
 - `Failed to append items to the matrix`
+- `Failed to sort source matrix`
 - `Failed to recreate the matrix`
 
 Типичные внутренние причины в `cause`:
@@ -471,10 +512,13 @@ console.log(columns);
 ## Бенчмарк
 
 ```bash
-pnpm benchmark
+pnpm test:bench
 ```
 
-Актуальные результаты: [benchmark/benchmark-results.md](benchmark/benchmark-results.md)
+Текущие benchmark-наборы лежат в:
+
+- [src/core/LayoutCalculationEngine/**test**/runtime/Matrix/Matrix.bench.ts](src/core/LayoutCalculationEngine/__test__/runtime/Matrix/Matrix.bench.ts)
+- [src/utils/**tests**/kWayMerge.bench.ts](src/utils/__tests__/kWayMerge.bench.ts)
 
 ## Участие в разработке
 

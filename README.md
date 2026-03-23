@@ -45,18 +45,20 @@ pnpm add masonry-blade
 
 ## Public API
 
-The package exports:
+The package has a single public entrypoint: `masonry-blade`.
+
+It exports:
 
 - `MasonryMatrix` - the main runtime facade
 - `MasonryMatrixError` and `MASONRY_MATRIX_ERROR_MESSAGES` - facade errors and constants
-- TypeScript contracts: `MasonryMatrixState` and `RecreateOptions`
-- Package subpath: `masonry-blade/matrixWorker` - worker entry for manual integration when needed
+- TypeScript contracts: `MasonryMatrixErrorMessage`, `MasonryMatrixState`, and `RecreateOptions`
 
 ```ts
 import {
 	MasonryMatrix,
 	MasonryMatrixError,
 	MASONRY_MATRIX_ERROR_MESSAGES,
+	type MasonryMatrixErrorMessage,
 	type MasonryMatrixState,
 	type RecreateOptions,
 } from 'masonry-blade';
@@ -65,12 +67,14 @@ import {
 ### Constructor
 
 ```ts
-new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount = 1, gap = 0)
+new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount: number, gap: number)
 ```
 
 - `rootWidth` - container width
 - `columnCount` - number of columns
 - `gap` - horizontal space between columns and vertical space between items
+
+All three constructor arguments are required.
 
 ### Methods
 
@@ -79,6 +83,13 @@ await matrix.append(items);
 ```
 
 Appends a new batch of items to the current matrix and returns the columns.
+
+```ts
+await matrix.sort(source);
+```
+
+Flattens a matrix source into a single array sorted by visual order: first by `y`, then by `x`.
+It does not rebuild the matrix and does not mutate the current facade state.
 
 ```ts
 await matrix.recreate({
@@ -123,35 +134,41 @@ This is the safe way to inspect internal service state without touching live int
 Input items are plain objects with this shape:
 
 ```ts
-type SourceItem = {
+{
 	id: string | number;
 	width: number;
 	height: number;
-};
+	meta?: TMeta;
+}
 ```
 
-Output items are plain objects with this shape:
+`append()` and `recreate()` return a matrix with this shape:
 
 ```ts
-type MatrixItem = {
-  id: string | number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-};
-
 readonly (readonly {
-  id: string | number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-  meta?: TMeta;
+	id: string | number;
+	width: number;
+	height: number;
+	x: number;
+	y: number;
+	meta?: TMeta;
 }[])[]
 ```
 
-If you create `new MasonryMatrix<TMeta>(...)`, every input item must include `meta: TMeta`, and every output item will keep the same `meta`.
+`sort()` returns a flat list with this shape:
+
+```ts
+readonly Readonly<{
+	id: string | number;
+	width: number;
+	height: number;
+	x: number;
+	y: number;
+	meta?: TMeta;
+}>[]
+```
+
+If you create `new MasonryMatrix<TMeta>(...)`, any provided `meta` value is typed as `TMeta`, and output items keep the same `meta`.
 
 Important: output `width` and `height` are already scaled to the column width. They are not the original dimensions.
 
@@ -168,10 +185,12 @@ const columns = await matrix.append([
 	{ id: '3', width: 1000, height: 1000 },
 ]);
 
-console.log(columns);
+const items = await matrix.sort(columns);
+
+console.log(items);
 ```
 
-`append()` and `recreate()` are always async. Even without a `Worker`, you still use `await`.
+`append()`, `sort()`, and `recreate()` are always async. Even without a `Worker`, you still use `await`.
 
 ## How it works
 
@@ -192,7 +211,7 @@ This gives you a fast and visually even layout without complex heuristics.
 ## Example with `meta`
 
 `meta` does not affect layout calculation, but it travels through the matrix together with the item.
-If you create `MasonryMatrix<TMeta>`, every item passed to `append(...)` must include `meta: TMeta`.
+If you create `MasonryMatrix<TMeta>`, any provided `meta` value is typed as `TMeta`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -219,6 +238,26 @@ const columns = await matrix.append([
 ]);
 
 console.log(columns[0][0].meta.src);
+```
+
+## Example: flatten columns for render order
+
+`append()` and `recreate()` return columns. If you need one flat render list ordered from top to bottom and then left to right, call `sort(...)`.
+
+```ts
+import { MasonryMatrix } from 'masonry-blade';
+
+const matrix = new MasonryMatrix(1200, 3, 16);
+
+const columns = await matrix.append([
+	{ id: '1', width: 1600, height: 900 },
+	{ id: '2', width: 800, height: 1200 },
+	{ id: '3', width: 1000, height: 1000 },
+]);
+
+const orderedItems = await matrix.sort(columns);
+
+console.log(orderedItems.map((item) => item.id));
 ```
 
 ## Example with coordinates
@@ -420,6 +459,7 @@ console.log(columns);
 - Treat the returned layout as read-only. The container arrays are safe to read, but mutating returned item objects is not part of the public contract.
 - Treat input items as immutable while a call is in flight.
 - In worker mode, payloads are sent through structured clone, so `meta` values must also be cloneable.
+- `sort()` reads from the `source` you pass in and does not modify the stored matrix state.
 
 ### Work with invalid items:
 
@@ -452,13 +492,15 @@ Invalid matrix parameters:
 - `columnCount <= 0` or `columnCount` is not an integer
 - `gap < 0` or `gap` is not a finite number
 - `gap` leaves no positive space for columns
-  Invalid items passed to `append()` or `recreate({ items })` do not throw. They are skipped instead. An item is skipped if its `id` is invalid, or if its `width` or `height` is not a positive finite number.
+
+Invalid items passed to `append()` or `recreate({ items })` do not throw. They are skipped instead. An item is skipped if its `id` is invalid, or if its `width` or `height` is not a positive finite number.
 
 Top-level errors are exposed as `MasonryMatrixError`. The `cause` may contain the original reason, including a `Worker` error, a structured clone / `postMessage(...)` error, or an engine validation error.
 
 Typical top-level messages:
 
 - `Failed to append items to the matrix`
+- `Failed to sort source matrix`
 - `Failed to recreate the matrix`
 
 Typical internal causes in `cause`:
@@ -470,10 +512,13 @@ Typical internal causes in `cause`:
 ## Benchmark
 
 ```bash
-pnpm benchmark
+pnpm test:bench
 ```
 
-Latest results: [benchmark/benchmark-results.md](benchmark/benchmark-results.md)
+Benchmark suites currently live in:
+
+- [src/core/LayoutCalculationEngine/**test**/runtime/Matrix/Matrix.bench.ts](src/core/LayoutCalculationEngine/__test__/runtime/Matrix/Matrix.bench.ts)
+- [src/utils/**tests**/kWayMerge.bench.ts](src/utils/__tests__/kWayMerge.bench.ts)
 
 ## Contributing
 

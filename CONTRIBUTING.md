@@ -40,13 +40,14 @@ pnpm lint
 pnpm lint:fix
 pnpm fmt
 pnpm fmt:check
-pnpm benchmark
+pnpm test:bench
 ```
 
 Notes:
 
 - `pnpm test` is useful during development if you want the default interactive test workflow.
 - `pnpm test:run` is the non-interactive test command used for validation and CI-style checks.
+- `pnpm test:bench` runs the repository benchmark suites.
 
 ## Project boundaries
 
@@ -104,8 +105,9 @@ Especially useful tests cover:
 
 - Invalid constructor arguments
 - Invalid item size handling
-- Append and recreate flows
+- Append, sort, and recreate flows
 - `recreate({ ... })` with and without explicit `items`
+- `sort(source)` ordering and non-mutating behavior
 - Preservation of `columnCount` and `gap` after a successful recreate
 - `meta` passthrough
 - Readonly return shape guarantees
@@ -120,7 +122,7 @@ Especially useful tests cover:
 If a change improves performance, include at least one of the following:
 
 - a reproducible measurement
-- a benchmark update
+- a benchmark run or benchmark-suite change when relevant
 - a short explanation of the trade-off
 
 Do not trade away readability or API clarity for tiny gains unless the benefit is clear.
@@ -134,7 +136,7 @@ That usually means updating one or more of:
 - `README.md`
 - `README.ru.md`
 - Public API examples
-- JSDoc for public APIs
+- Inline docs or comments for public APIs, if present
 
 ## Pull requests
 
@@ -152,7 +154,7 @@ pnpm build
 If your changes affect performance-critical code, please include benchmark results in the pull request description by running:
 
 ```bash
-pnpm benchmark
+pnpm test:bench
 ```
 
 ### What a good PR looks like
@@ -198,7 +200,7 @@ When proposing a feature, explain:
 - The problem
 - Why the current API is not enough
 - The smallest useful addition
-- Whether the feature affects worker mode, `recreate({ ... })` semantics, return shapes, or determinism
+- Whether the feature affects worker mode, `sort(source)` semantics, `recreate({ ... })` semantics, return shapes, or determinism
 
 ## Documentation contributions
 
