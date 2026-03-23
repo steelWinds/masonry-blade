@@ -308,9 +308,7 @@ const initialItems = [
 	},
 ];
 
-const render = (columns) => {
-	const placedItems = columns.flat();
-
+const render = (placedItems) => {
 	container.innerHTML = '';
 
 	for (const item of placedItems) {
@@ -330,8 +328,10 @@ const render = (columns) => {
 
 async function main() {
 	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
+	const columns = await matrix.append(initialItems);
+	const placedItems = await matrix.sort(columns);
 
-	render(await matrix.append(initialItems));
+	render(placedItems);
 }
 
 main();
@@ -385,9 +385,7 @@ const initialItems = [
 	},
 ];
 
-const render = (columns) => {
-	const placedItems = columns.flat();
-
+const render = (placedItems) => {
 	container.innerHTML = '';
 
 	for (const item of placedItems) {
@@ -407,8 +405,10 @@ const render = (columns) => {
 
 async function main() {
 	const matrix = new MasonryMatrix(container.clientWidth, 4, 16);
+	const initialColumns = await matrix.append(initialItems);
+	const initialPlacedItems = await matrix.sort(initialColumns);
 
-	render(await matrix.append(initialItems));
+	render(initialPlacedItems);
 
 	window.addEventListener('resize', async () => {
 		const width = container.clientWidth;
@@ -419,8 +419,9 @@ async function main() {
 			columnCount: columns,
 			items: initialItems,
 		});
+		const rebuiltItems = await matrix.sort(rebuilt);
 
-		render(rebuilt);
+		render(rebuiltItems);
 	});
 }
 
