@@ -1,12 +1,12 @@
 import type { MatrixComputedUnit } from '../../contract';
 
-export class MatrixUnit<T = undefined> implements MatrixComputedUnit<T> {
+export class MatrixUnit<Meta = undefined> implements MatrixComputedUnit<Meta> {
 	public readonly id: string | number;
 	public readonly height: number;
 	public readonly width: number;
 	public readonly x: number;
 	public readonly y: number;
-	public readonly meta?: T;
+	public readonly meta?: Meta;
 
 	constructor(
 		id: string | number,
@@ -14,7 +14,7 @@ export class MatrixUnit<T = undefined> implements MatrixComputedUnit<T> {
 		width: number,
 		x: number,
 		y: number,
-		meta?: T,
+		meta?: Meta,
 	) {
 		this.id = id;
 		this.height = height;

@@ -17,12 +17,12 @@ export interface LayoutWorkerAppendResponse<
 	};
 }
 
-export interface LayoutWorkerSortResponse<T extends LayoutComputedUnit> {
+export interface LayoutWorkerSortResponse<Unit extends LayoutComputedUnit> {
 	id: number;
 	ok: true;
 	type: 'sort';
 	payload: {
-		items: readonly Readonly<T>[];
+		items: readonly Readonly<Unit>[];
 	};
 }
 

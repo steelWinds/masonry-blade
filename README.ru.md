@@ -1,7 +1,5 @@
 # masonry-blade
 
-> Created in honor of _Anna Stefu_ — my greatest love 🦇💜
-
 ![GitHub License](https://img.shields.io/github/license/steelWinds/masonry-blade)
 [![Module type: ESM](https://img.shields.io/badge/module%20type-esm-brightgreen)](https://github.com/voxpelli/badges-cjs-esm)
 [![build-validate](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml/badge.svg)](https://github.com/steelWinds/masonry-blade/actions/workflows/build-validate.yml)
@@ -17,17 +15,17 @@
   <img align="right" width="150" height="150" src="./.github/logo.webp" alt="masonry-blade logo">
 </p>
 
-**masonry-blade** - маленький и быстрый движок для расчёта masonry-сеток без зависимостей.
+**masonry-blade** - миниатюрный, быстрый и расширяемый **движок** для расчёта masonry-сеток **с нулем завистимостей** 🤤
 
-- **🪶 Очень маленький.** Решает одну задачу и не разрастается во фреймворк.
-- **⚡ Быстрый.** Жадная балансировка, мутируемое состояние и минимум лишней работы.
-- **⚖️ Сбалансированный.** Каждый новый элемент попадает в самую короткую колонку.
-- **📦 Без зависимостей.** Только расчёт, координаты и типы.
-- **🎨 Не привязан к UI.** Подходит для `React`, `Vue`, `Svelte`, `Canvas` и `Vanilla JS`.
-- **🏷️ Поддерживает метаданные.** В элементах сетки могут быть любые дополнительные данные для их последующей отрисовки.
-- **💤 Поддерживает lazy-load.** Добавляй элементы порциями без потери текущей раскладки.
-- **🔄 Умеет пересобирать матрицу.** Раскладку можно пересчитать под новую ширину, число колонок и `gap` из явно переданного батча элементов.
-- **🧵 Умеет работать через `Web Worker`.** А при его отсутствии или отключении спокойно считает синхронно.
+- **🪶 Лёгкий** - Решает ровно одну задачу, и решает хорошо.
+- **⚡ Быстрый** - Жадная балансировка, сортировка k-way, минимум лишнего.
+- **⚖️ Балансировка** - Сетка идеально сбалансированна.
+- **📦 Ноль зависимостей** - Ничего лишнего.
+- **🎨 Не привязан к UI** - Подходит для `React`, `Vue`, `Svelte`, `Canvas` и `Vanilla JS`.
+- **🏷️ Поддерживает метаданные** - В элементах сетки могут быть любые дополнительные данные для их последующей отрисовки.
+- **💤 Поддерживает lazy-load** - Добавляй элементы порциями без потери текущей раскладки.
+- **🔄 Умеет пересобирать матрицу** - Раскладку можно пересчитать под новую ширину, число колонок и `gap`.
+- **🧵 Умеет работать через `Web Worker`** - А при его отсутствии или отключении спокойно считает синхронно.
 
 > Вы даёте ему исходные размеры элементов, а он возвращает готовые `x`, `y`, `width`, `height` для рендера в любом UI. Без DOM, без привязки к фреймворку и без раздутого API.
 
@@ -47,13 +45,9 @@ pnpm add masonry-blade
 
 ## Публичное API
 
-У пакета только одна публичная точка входа: `masonry-blade`.
-
-Из неё экспортируются:
-
-- `MasonryMatrix` - основной runtime-фасад
+- `MasonryMatrix` - основной фасад
 - `MasonryMatrixError` и `MASONRY_MATRIX_ERROR_MESSAGES` - ошибки и константы фасада
-- TypeScript-контракты: `MasonryMatrixErrorMessage`, `MasonryMatrixState` и `RecreateOptions`
+- TypeScript-типы: `MasonryMatrixErrorMessage`, `MasonryMatrixState` и `RecreateOptions`
 
 ```ts
 import {
@@ -69,7 +63,7 @@ import {
 ### Конструктор
 
 ```ts
-new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount: number, gap: number)
+new MasonryMatrix<Meta = undefined>(rootWidth: number, columnCount: number, gap: number)
 ```
 
 - `rootWidth` - ширина контейнера
@@ -90,7 +84,7 @@ await matrix.append(items);
 await matrix.sort(source);
 ```
 
-Преобразует matrix-source в один плоский массив, отсортированный по визуальному порядку: сначала по `y`, затем по `x`.
+Преобразует source в один плоский массив, отсортированный по визуальному порядку: сначала по `y`, затем по `x`.
 Матрицу заново не пересобирает и текущее состояние фасада не мутирует.
 
 ```ts
@@ -140,21 +134,21 @@ const state = matrix.getState();
 	id: string | number;
 	width: number;
 	height: number;
-	meta?: TMeta;
+	meta?: Meta;
 }
 ```
 
 `append()` и `recreate()` возвращают матрицу такой формы:
 
 ```ts
-readonly (readonly {
+readonly (readonly Readonly<{
 	id: string | number;
 	width: number;
 	height: number;
 	x: number;
 	y: number;
-	meta?: TMeta;
-}[])[]
+	meta?: Meta;
+}>[])[]
 ```
 
 `sort()` возвращает плоский список такой формы:
@@ -170,7 +164,7 @@ readonly Readonly<{
 }>[]
 ```
 
-Если вы создаёте `new MasonryMatrix<TMeta>(...)`, любое переданное `meta` будет типизировано как `TMeta`, а выходные элементы сохранят то же `meta`.
+Если вы создаёте `new MasonryMatrix<TMeta>(...)`, любое переданное `meta` будет типизировано как `Meta`, а выходные элементы сохранят то же `meta`.
 
 Важно: `width` и `height` на выходе уже пересчитаны под ширину колонки. Это не исходные размеры.
 
@@ -213,7 +207,7 @@ columnWidth = (rootWidth - gap * (columnCount - 1)) / columnCount;
 ## Пример с `meta`
 
 `meta` не участвует в расчётах, но проходит через всю матрицу вместе с элементом.
-Если вы создаёте `MasonryMatrix<TMeta>`, любое переданное `meta` будет типизировано как `TMeta`.
+Если вы создаёте `MasonryMatrix<Meta>`, любое переданное `meta` будет типизировано как `Meta`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -477,17 +471,17 @@ console.log(columns);
 
 ### Получение текущего состояния MasonryMatrix:
 
-- `getState()` возвращает снимок служебного состояния. Поля `columnsHeights` и `order` в нём клонируются, поэтому их можно читать без риска повредить внутренний state экземпляра.
+- `getState()` возвращает снимок служебного состояния. Поля `columnsHeights` и `order` в нём клонируются, поэтому их можно читать без риска повредить внутреннее состояние.
 
 ### Ограничения
 
 - У библиотеки нет API для удаления, обновления или точечной перестановки отдельных элементов.
 - Библиотека не работает с DOM сама. Измерение контейнера, выбор breakpoints и рендер - на вашей стороне.
-- `recreate()` не переиспользует предыдущие батчи из `append()` автоматически. Если нужна пересборка по исходным данным, передавайте `items` явно.
+- `recreate()` не переиспользует предыдущие элементы из `append()` автоматически. Если нужна пересборка по исходным данным, передавайте `items` явно.
 
 ## Ошибки и валидация
 
-Библиотека валидирует параметры матрицы и фильтрует батчи элементов.
+Библиотека валидирует параметры матрицы и фильтрует элементы элементов.
 
 Невалидные параметры матрицы:
 

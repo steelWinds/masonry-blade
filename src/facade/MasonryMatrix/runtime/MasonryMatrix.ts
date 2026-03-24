@@ -6,28 +6,32 @@ import {
 	type MatrixSnapshot,
 	type MatrixSourceUnit,
 	type ReadonlyMatrix,
+	type ReadonlySortItems,
 	WebWorker,
 } from 'src/core/LayoutCalculationEngine';
 
-export class MasonryMatrix<T = undefined> {
+export class MasonryMatrix<Meta = undefined> {
 	private readonly _engine: WebWorker<
-		ReadonlyMatrix<T>,
-		MatrixSnapshot<T>,
-		MatrixComputedUnit<T>
+		ReadonlyMatrix<Meta>,
+		MatrixSnapshot<Meta>,
+		MatrixComputedUnit<Meta>
 	>;
-	constructor(...args: ConstructorParameters<typeof Matrix<T>>) {
+
+	constructor(...args: ConstructorParameters<typeof Matrix<Meta>>) {
 		this._engine = new WebWorker<
-			ReadonlyMatrix<T>,
-			MatrixSnapshot<T>,
-			MatrixComputedUnit<T>
+			ReadonlyMatrix<Meta>,
+			MatrixSnapshot<Meta>,
+			MatrixComputedUnit<Meta>
 		>(
 			new Matrix(...args),
 			new URL(import.meta.env.MATRIX_ENGINE_WORKER, import.meta.url).href,
 		);
 	}
 
-	private _restoreMatrix(snapshot: Readonly<MatrixSnapshot<T>>): Matrix<T> {
-		const matrix = new Matrix<T>(
+	private _restoreMatrix(
+		snapshot: Readonly<MatrixSnapshot<Meta>>,
+	): Matrix<Meta> {
+		const matrix = new Matrix<Meta>(
 			snapshot.rootWidth,
 			snapshot.columnCount,
 			snapshot.gap,
@@ -65,12 +69,10 @@ export class MasonryMatrix<T = undefined> {
 	}
 
 	public async append(
-		items: readonly Readonly<MatrixSourceUnit<T>>[],
-	): Promise<Readonly<ReadonlyMatrix<T>>> {
+		items: readonly Readonly<MatrixSourceUnit<Meta>>[],
+	): Promise<ReadonlyMatrix<Meta>> {
 		try {
-			const snapshot = await this._engine.append(items);
-
-			return snapshot.internalState;
+			return await this._engine.append(items);
 		} catch (error: unknown) {
 			throw new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.APPEND_ITEMS, {
 				cause: error,
@@ -79,12 +81,10 @@ export class MasonryMatrix<T = undefined> {
 	}
 
 	public async sort(
-		source: ReadonlyMatrix<T>,
-	): Promise<readonly Readonly<MatrixComputedUnit<T>>[]> {
+		source: ReadonlyMatrix<Meta>,
+	): Promise<ReadonlySortItems<Meta>> {
 		try {
-			const sorted = await this._engine.sort(source);
-
-			return sorted;
+			return await this._engine.sort(source);
 		} catch (error: unknown) {
 			throw new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.SORT_MATRIX, {
 				cause: error,
@@ -93,8 +93,8 @@ export class MasonryMatrix<T = undefined> {
 	}
 
 	public async recreate(
-		options: RecreateOptions<T>,
-	): Promise<Readonly<ReadonlyMatrix<T>>> {
+		options: RecreateOptions<Meta>,
+	): Promise<ReadonlyMatrix<Meta>> {
 		const previousSnapshot = this._engine.snapshot();
 
 		const { rootWidth, columnCount, gap, items } = options;
@@ -103,10 +103,11 @@ export class MasonryMatrix<T = undefined> {
 		const newGap = gap ?? previousSnapshot.gap;
 
 		try {
-			this._engine.setEngine(new Matrix<T>(rootWidth, newColumnCount, newGap));
-			const snapshot = await this._engine.append(items ?? []);
+			this._engine.setEngine(
+				new Matrix<Meta>(rootWidth, newColumnCount, newGap),
+			);
 
-			return snapshot.internalState;
+			return await this._engine.append(items ?? []);
 		} catch (error: unknown) {
 			this._engine.setEngine(this._restoreMatrix(previousSnapshot));
 

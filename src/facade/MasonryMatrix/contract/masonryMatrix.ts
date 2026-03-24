@@ -10,9 +10,9 @@ export interface MasonryMatrixState {
 	readonly workerDisabled: boolean;
 }
 
-export interface RecreateOptions<T = undefined> {
+export interface RecreateOptions<Meta = undefined> {
 	readonly rootWidth: number;
 	readonly columnCount?: number;
 	readonly gap?: number;
-	readonly items?: readonly Readonly<MatrixSourceUnit<T>>[];
+	readonly items?: readonly Readonly<MatrixSourceUnit<Meta>>[];
 }

@@ -4,17 +4,25 @@ import type {
 	LayoutSourceUnit,
 } from './layout';
 
-export interface MatrixSourceUnit<T = undefined> extends LayoutSourceUnit {
-	meta?: T;
+export interface MatrixSourceUnit<Meta = undefined> extends LayoutSourceUnit {
+	meta?: Meta;
 }
 
-export interface MatrixComputedUnit<T = undefined> extends LayoutComputedUnit {
-	readonly meta?: T;
+export interface MatrixComputedUnit<
+	Meta = undefined,
+> extends LayoutComputedUnit {
+	readonly meta?: Meta;
 }
 
-export type ReadonlyMatrix<T = undefined> = Readonly<MatrixComputedUnit<T>>[][];
+export type ReadonlySortItems<Meta = undefined> = readonly Readonly<
+	MatrixComputedUnit<Meta>
+>[];
+export type ReadonlyMatrix<Meta = undefined> =
+	readonly ReadonlySortItems<Meta>[];
 
-export interface MatrixSnapshot<T> extends LayoutSnapshot<ReadonlyMatrix<T>> {
+export interface MatrixSnapshot<Meta = undefined> extends LayoutSnapshot<
+	ReadonlyMatrix<Meta>
+> {
 	readonly columnHeights: Readonly<Float64Array>;
 	readonly columnWidth: number;
 	readonly order: Readonly<Uint32Array>;

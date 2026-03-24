@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
-import { isPositiveFiniteNumber } from 'src/utils/IsFiniteNonZero';
+import { isPositiveFiniteNumber } from 'src/utils';
 
 describe('isPositiveFiniteNumber', () => {
 	test('returns true for positive finite numbers', () => {

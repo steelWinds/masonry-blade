@@ -246,7 +246,7 @@ describe('WebWorker', () => {
 		expect(engine.append).toHaveBeenCalledTimes(1);
 		expect(engine.append).toHaveBeenCalledWith(items);
 		expect(engine.fromSnapshot).not.toHaveBeenCalled();
-		expect(result).toBe(snapshot);
+		expect(result).toBe(snapshot.internalState);
 	});
 
 	test('sort() falls back to engine.sort() when Worker is unavailable', async () => {
@@ -303,7 +303,7 @@ describe('WebWorker', () => {
 
 		expect(engine.fromSnapshot).toHaveBeenCalledTimes(1);
 		expect(engine.fromSnapshot).toHaveBeenCalledWith(nextSnapshot);
-		expect(result).toBe(nextSnapshot);
+		expect(result).toBe(nextSnapshot.internalState);
 	});
 
 	test('sort() creates worker, sends sort payload and returns worker items', async () => {
@@ -441,7 +441,7 @@ describe('WebWorker', () => {
 		expect(FakeWorker.constructionAttempts).toBe(1);
 		expect(engine.append).toHaveBeenCalledTimes(1);
 		expect(engine.append).toHaveBeenCalledWith(items);
-		expect(result).toBe(snapshot);
+		expect(result).toBe(snapshot.internalState);
 	});
 
 	test('enable() recreates worker after disable()', () => {
@@ -480,7 +480,7 @@ describe('WebWorker', () => {
 		expect(FakeWorker.constructionAttempts).toBe(1);
 		expect(engine.append).toHaveBeenCalledWith(items);
 		expect(engine.sort).toHaveBeenCalledWith(source);
-		expect(appendResult).toBe(snapshot);
+		expect(appendResult).toBe(snapshot.internalState);
 		expect(sortResult).toBe(sorted);
 
 		FakeWorker.constructShouldThrow = false;
@@ -508,7 +508,7 @@ describe('WebWorker', () => {
 
 					expect(engine.append).toHaveBeenCalledTimes(1);
 					expect(engine.append).toHaveBeenCalledWith(items);
-					expect(result).toBe(snapshot);
+					expect(result).toBe(snapshot.internalState);
 				},
 			),
 			{

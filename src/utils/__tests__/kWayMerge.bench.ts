@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
 import { bench, describe } from 'vitest';
 import { FAKER_SEED } from 'tests/constants';
-import { kWayMerge } from 'src/utils/kWayMerge';
+import { kWayMerge } from 'src/utils';
 
 type Interval = {
 	start: number;

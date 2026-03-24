@@ -8,10 +8,10 @@ import {
 	bindLayoutWorker,
 } from 'src/core/LayoutCalculationEngine';
 
-const restoreMatrixFromSnapshot = <T = undefined>(
-	snapshot: Readonly<MatrixSnapshot<T>>,
-): Matrix<T> => {
-	const matrix = new Matrix<T>(
+const restoreMatrixFromSnapshot = <Meta = undefined>(
+	snapshot: Readonly<MatrixSnapshot<Meta>>,
+): Matrix<Meta> => {
+	const matrix = new Matrix<Meta>(
 		snapshot.rootWidth,
 		snapshot.columnCount,
 		snapshot.gap,

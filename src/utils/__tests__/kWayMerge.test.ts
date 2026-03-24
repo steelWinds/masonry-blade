@@ -2,7 +2,7 @@ import * as fc from 'fast-check';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { FAKER_SEED } from 'tests/constants';
 import { faker } from '@faker-js/faker';
-import { kWayMerge } from 'src/utils/kWayMerge';
+import { kWayMerge } from 'src/utils';
 
 type Interval = {
 	start: number;

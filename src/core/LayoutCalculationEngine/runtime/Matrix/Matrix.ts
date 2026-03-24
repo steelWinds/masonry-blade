@@ -4,20 +4,20 @@ import type {
 	MatrixSnapshot,
 	MatrixSourceUnit,
 	ReadonlyMatrix,
+	ReadonlySortItems,
 } from '../../contract';
 import { MATRIX_ERRORS, MatrixError } from '../../errors';
+import { isPositiveFiniteNumber, kWayMerge } from 'src/utils';
 import { MatrixUnit } from './MatrixUnit';
-import { isPositiveFiniteNumber } from 'src/utils/IsFiniteNonZero';
-import { kWayMerge } from 'src/utils/kWayMerge';
 
-export class Matrix<T = undefined> implements LayoutCalculationEngine<
-	ReadonlyMatrix<T>,
-	MatrixSnapshot<T>,
-	MatrixComputedUnit<T>
+export class Matrix<Meta = undefined> implements LayoutCalculationEngine<
+	ReadonlyMatrix<Meta>,
+	MatrixSnapshot<Meta>,
+	MatrixComputedUnit<Meta>
 > {
 	private _order: Uint32Array;
 	private _columnHeights: Float64Array;
-	private _matrix: MatrixComputedUnit<T>[][];
+	private _matrix: MatrixComputedUnit<Meta>[][];
 	private _rootWidth: number;
 	private _realWidth: number;
 	private _columnCount: number;
@@ -45,7 +45,7 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 		this._columnHeights = new Float64Array(this._columnCount);
 		this._matrix = Object.freeze(
 			Array.from({ length: this._columnCount }, () => []),
-		) as unknown as MatrixComputedUnit<T>[][];
+		) as unknown as MatrixComputedUnit<Meta>[][];
 
 		for (let i = 0; i < this._columnCount; i++) {
 			this._order[i] = i;
@@ -80,7 +80,7 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 		return (typeof id === 'string' && id.length > 0) || Number.isFinite(id);
 	}
 
-	private _isValidSourceItem(sourceItem: Readonly<MatrixSourceUnit<T>>) {
+	private _isValidSourceItem(sourceItem: Readonly<MatrixSourceUnit<Meta>>) {
 		return (
 			isPositiveFiniteNumber(sourceItem.width) &&
 			isPositiveFiniteNumber(sourceItem.height) &&
@@ -98,7 +98,9 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 		}
 	}
 
-	append(arr: readonly Readonly<MatrixSourceUnit<T>>[]): ReadonlyMatrix<T> {
+	append(
+		arr: readonly Readonly<MatrixSourceUnit<Meta>>[],
+	): ReadonlyMatrix<Meta> {
 		for (let idx = 0; idx < arr.length; idx++) {
 			const item = arr[idx];
 
@@ -117,7 +119,7 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 			const x = shortest * (width + this._gap);
 
 			shortestColumn.push(
-				new MatrixUnit<T>(item.id, height, width, x, y, item.meta),
+				new MatrixUnit<Meta>(item.id, height, width, x, y, item.meta),
 			);
 
 			const newColumnHeight = y + height;
@@ -143,7 +145,7 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 		return this._matrix.map((column) => [...column]);
 	}
 
-	snapshot(): Readonly<MatrixSnapshot<T>> {
+	snapshot(): Readonly<MatrixSnapshot<Meta>> {
 		return {
 			columnCount: this._columnCount,
 			columnHeights: new Float64Array(this._columnHeights),
@@ -156,7 +158,7 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 		};
 	}
 
-	fromSnapshot(snapshot: MatrixSnapshot<T>): void {
+	fromSnapshot(snapshot: MatrixSnapshot<Meta>): void {
 		this._rootWidth = snapshot.rootWidth;
 		this._realWidth = snapshot.realWidth;
 		this._columnCount = snapshot.columnCount;
@@ -166,12 +168,10 @@ export class Matrix<T = undefined> implements LayoutCalculationEngine<
 		this._gap = snapshot.gap;
 		this._matrix = Object.freeze(
 			snapshot.internalState.map((column) => [...column]),
-		) as unknown as MatrixComputedUnit<T>[][];
+		) as unknown as MatrixComputedUnit<Meta>[][];
 	}
 
-	sort(
-		source: readonly (readonly Readonly<MatrixUnit<T>>[])[],
-	): readonly Readonly<MatrixComputedUnit<T>>[] {
+	sort(source: ReadonlyMatrix<Meta>): ReadonlySortItems<Meta> {
 		return kWayMerge(source, (a, b) => a.y - b.y || a.x - b.x);
 	}
 }

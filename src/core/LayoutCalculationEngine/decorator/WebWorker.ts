@@ -175,8 +175,7 @@ export class WebWorker<
 		this._ensureWorker();
 
 		if (this._worker == null) {
-			this._engine.append(arr);
-			return this._engine.snapshot();
+			return this._engine.append(arr);
 		}
 
 		try {
@@ -193,14 +192,14 @@ export class WebWorker<
 
 			this._engine.fromSnapshot(snapshot);
 
-			return snapshot;
+			return snapshot.internalState;
 		} catch (error: unknown) {
 			this._dispose();
 			this._wrapWorkerError(error);
 		}
 	}
 
-	public async sort(source: Return): Promise<readonly Readonly<Unit>[]> {
+	public async sort(source: Return) {
 		this._ensureWorker();
 
 		if (this._worker == null) {
