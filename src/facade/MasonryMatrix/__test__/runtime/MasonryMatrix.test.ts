@@ -36,9 +36,21 @@ class FakeWorker {
 		FakeWorker.instances.push(this);
 	}
 
+	private get requestId(): number {
+		const id = (this.lastMessage as { id?: unknown } | undefined)?.id;
+
+		if (typeof id !== 'number') {
+			throw new Error('FakeWorker expected request id in lastMessage');
+		}
+
+		return id;
+	}
+
 	public emitAppend(snapshot: Readonly<MatrixSnapshot<unknown>>): void {
 		this.onmessage?.({
 			data: {
+				id: this.requestId,
+				ok: true,
 				payload: {
 					snapshot,
 				},
@@ -50,6 +62,8 @@ class FakeWorker {
 	public emitSort(items: readonly unknown[]): void {
 		this.onmessage?.({
 			data: {
+				id: this.requestId,
+				ok: true,
 				payload: {
 					items,
 				},
@@ -235,6 +249,7 @@ describe('MasonryMatrix', () => {
 		expect(worker.options).toStrictEqual({ type: 'module' });
 		expect(String(worker.scriptURL)).toContain('matrixWorker.test.js');
 		expect(worker.postMessage).toHaveBeenCalledWith({
+			id: 1,
 			payload: {
 				items: INITIAL_ITEMS,
 				snapshot: new Matrix<TestMeta>(400, 2, 10).snapshot(),
@@ -278,6 +293,7 @@ describe('MasonryMatrix', () => {
 		const [worker] = FakeWorker.instances;
 
 		expect(worker.postMessage).toHaveBeenCalledWith({
+			id: 1,
 			payload: {
 				snapshot: expectedSnapshot,
 				source,

@@ -43,7 +43,7 @@ export const bindLayoutWorker = <
 				case 'append': {
 					const engine = adapter.restore(message.payload.snapshot);
 
-					engine.append(message.payload.items);
+					await engine.append(message.payload.items);
 
 					const snapshot = engine.snapshot() as Readonly<Snapshot>;
 

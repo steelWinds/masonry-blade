@@ -15,19 +15,19 @@
   <img align="right" width="150" height="150" src="./.github/logo.webp" alt="masonry-blade logo">
 </p>
 
-**masonry-blade** is a small, fast, dependency-free engine for masonry grid layout calculation.
+**masonry-blade** is a tiny, fast, and extensible **engine** for masonry grid calculation with **zero dependencies** 🤤
 
-- **🪶 Very small.** It solves one problem and does not grow into a framework.
-- **⚡ Fast.** Greedy balancing, mutable state, and minimal overhead.
-- **⚖️ Balanced.** Each new item is placed into the shortest column.
-- **📦 Dependency-free.** Only calculation, coordinates, and types.
-- **🎨 UI-agnostic.** Works with `React`, `Vue`, `Svelte`, `Canvas`, and `Vanilla JS`.
-- **🏷️ Metadata-friendly.** Grid items can carry any extra data you need for rendering.
-- **💤 Lazy-load friendly.** Append items in batches without losing the current layout.
-- **🔄 Rebuildable.** You can rebuild the layout for a new width, column count, or `gap` from an explicit item batch.
-- **🧵 `Web Worker` support.** If a worker is unavailable or disabled, calculations fall back to sync mode.
+- **🪶 Lightweight** - It solves exactly one problem, and solves it well.
+- **⚡ Fast** - Greedy balancing, k-way merge, and very little overhead.
+- **⚖️ Balanced** - Each next item goes into the shortest column.
+- **📦 Zero dependencies** - Nothing extra.
+- **🎨 UI-agnostic** - Works with `React`, `Vue`, `Svelte`, `Canvas`, and `Vanilla JS`.
+- **🏷️ Supports metadata** - Grid items can carry any extra data you need for rendering.
+- **💤 Supports lazy-load** - Append items in batches without losing the current layout.
+- **🔄 Can rebuild the matrix** - Recalculate the layout for a new width, column count, or `gap`.
+- **🧵 Can run through `Web Worker`** - And if it is unavailable or disabled, it falls back to sync calculation.
 
-> You pass in source item sizes, and it returns ready-to-render `x`, `y`, `width`, and `height` for any UI. No DOM, no framework coupling, no bloated API.
+> You pass in source item sizes, and it returns ready-to-render `x`, `y`, `width`, and `height` for any UI. No DOM, no framework coupling, and no bloated API.
 
 ## Installation
 
@@ -45,13 +45,9 @@ pnpm add masonry-blade
 
 ## Public API
 
-The package has a single public entrypoint: `masonry-blade`.
-
-It exports:
-
-- `MasonryMatrix` - the main runtime facade
+- `MasonryMatrix` - the main facade
 - `MasonryMatrixError` and `MASONRY_MATRIX_ERROR_MESSAGES` - facade errors and constants
-- TypeScript contracts: `MasonryMatrixErrorMessage`, `MasonryMatrixState`, and `RecreateOptions`
+- TypeScript types: `MasonryMatrixErrorMessage`, `MasonryMatrixState`, and `RecreateOptions`
 
 ```ts
 import {
@@ -67,7 +63,7 @@ import {
 ### Constructor
 
 ```ts
-new MasonryMatrix<TMeta = undefined>(rootWidth: number, columnCount: number, gap: number)
+new MasonryMatrix<Meta = undefined>(rootWidth: number, columnCount: number, gap: number)
 ```
 
 - `rootWidth` - container width
@@ -88,7 +84,7 @@ Appends a new batch of items to the current matrix and returns the columns.
 await matrix.sort(source);
 ```
 
-Flattens a matrix source into a single array sorted by visual order: first by `y`, then by `x`.
+Transforms `source` into one flat array sorted by visual order: first by `y`, then by `x`.
 It does not rebuild the matrix and does not mutate the current facade state.
 
 ```ts
@@ -127,9 +123,9 @@ const state = matrix.getState();
 ```
 
 Returns a snapshot of the current facade state: `columnCount`, `columnWidth`, `gap`, `workerCreated`, `workerDisabled`, and copies of `columnsHeights` and `order`.
-This is the safe way to inspect internal service state without touching live internal columns.
+This is a safe way to inspect service state without touching live internal columns.
 
-## Expected input and output
+## What data the library expects
 
 Input items are plain objects with this shape:
 
@@ -138,21 +134,21 @@ Input items are plain objects with this shape:
 	id: string | number;
 	width: number;
 	height: number;
-	meta?: TMeta;
+	meta?: Meta;
 }
 ```
 
 `append()` and `recreate()` return a matrix with this shape:
 
 ```ts
-readonly (readonly {
+readonly (readonly Readonly<{
 	id: string | number;
 	width: number;
 	height: number;
 	x: number;
 	y: number;
-	meta?: TMeta;
-}[])[]
+	meta?: Meta;
+}>[])[]
 ```
 
 `sort()` returns a flat list with this shape:
@@ -164,11 +160,11 @@ readonly Readonly<{
 	height: number;
 	x: number;
 	y: number;
-	meta?: TMeta;
+	meta?: Meta;
 }>[]
 ```
 
-If you create `new MasonryMatrix<TMeta>(...)`, any provided `meta` value is typed as `TMeta`, and output items keep the same `meta`.
+If you create `new MasonryMatrix<Meta>(...)`, any provided `meta` value is typed as `Meta`, and output items keep the same `meta`.
 
 Important: output `width` and `height` are already scaled to the column width. They are not the original dimensions.
 
@@ -190,11 +186,11 @@ const items = await matrix.sort(columns);
 console.log(items);
 ```
 
-`append()`, `sort()`, and `recreate()` are always async. Even without a `Worker`, you still use `await`.
+`append()`, `sort()`, and `recreate()` are always async. Even if `Worker` is not used, you still work through `await`.
 
 ## How it works
 
-Internally, the flow is simple:
+Internally, everything is simple:
 
 1. First, the column width is calculated:
 
@@ -210,8 +206,8 @@ This gives you a fast and visually even layout without complex heuristics.
 
 ## Example with `meta`
 
-`meta` does not affect layout calculation, but it travels through the matrix together with the item.
-If you create `MasonryMatrix<TMeta>`, any provided `meta` value is typed as `TMeta`.
+`meta` does not participate in the calculation, but it travels through the whole matrix together with the item.
+If you create `MasonryMatrix<Meta>`, any provided `meta` value is typed as `Meta`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -240,9 +236,9 @@ const columns = await matrix.append([
 console.log(columns[0][0].meta.src);
 ```
 
-## Example: flatten columns for render order
+## Example: get flat render order
 
-`append()` and `recreate()` return columns. If you need one flat render list ordered from top to bottom and then left to right, call `sort(...)`.
+`append()` and `recreate()` return columns. If you need one flat list for rendering from top to bottom and then from left to right, call `sort(...)`.
 
 ```ts
 import { MasonryMatrix } from 'masonry-blade';
@@ -339,7 +335,7 @@ main();
 
 ## Example: rebuild on resize
 
-`recreate()` rebuilds the grid from the explicit item list you pass in.
+`recreate()` recalculates the grid from the explicit list of items you pass in.
 
 ```js
 import { MasonryMatrix } from 'masonry-blade';
@@ -428,7 +424,7 @@ async function main() {
 main();
 ```
 
-If you call only `recreate({ rootWidth: newWidth })`, the library reuses the last successful `columnCount` and `gap`, but because no `items` were passed, the rebuilt layout is empty.
+If you call only `recreate({ rootWidth: newWidth })`, the library uses the last successful `columnCount` and `gap`, but because `items` are not passed, the rebuilt layout will be empty.
 
 ## Example: `Worker` control
 
@@ -455,37 +451,37 @@ console.log(columns);
 
 ## Important notes
 
-### Mutation source:
+### Mutation of returned data
 
-- Treat the returned layout as read-only. The container arrays are safe to read, but mutating returned item objects is not part of the public contract.
-- Treat input items as immutable while a call is in flight.
-- In worker mode, payloads are sent through structured clone, so `meta` values must also be cloneable.
-- `sort()` reads from the `source` you pass in and does not modify the stored matrix state.
+- Treat the returned layout as read-only. Container arrays are safe to read, but mutating item objects themselves is not part of the public contract.
+- Treat input items as immutable while a call is running.
+- In worker mode, the payload goes through structured clone, so values inside `meta` must also be cloneable.
+- `sort()` only reads the `source` you pass in and does not modify the stored matrix state.
 
-### Work with invalid items:
+### Working with invalid objects
 
-- `append()` and `recreate({ items })` silently skip items whose `id` is invalid, or whose `width` or `height` is not a positive finite number.
+- `append()` and `recreate({ items })` silently skip items whose `id` is neither a finite number nor a non-empty string, or whose `width` or `height` is not a positive finite number.
 
-### Work with Web-Worker:
+### Working with `Web Worker`
 
 - `terminateWorker()`, `disableWorker()`, and `enableWorker()` can interrupt a running worker calculation.
-- If `Worker` is unavailable or creation fails, the library automatically falls back to sync mode and stays there until you explicitly call `enableWorker()`.
+- If `Worker` is unavailable or creation fails, the library automatically falls back to the synchronous path and stays there until you explicitly call `enableWorker()`.
 - After `disableWorker()`, sync mode stays active until you explicitly call `enableWorker()`.
-- If calculation runs through a `Worker`, `meta` data must support structured clone. Functions, DOM nodes, and similar values may fail on `postMessage(...)`.
+- If calculation runs through a `Worker`, data inside `meta` must support structured clone. Functions, DOM nodes, and similar values may fail on `postMessage(...)`.
 
-### Get current MasonryMatrix state:
+### Getting the current `MasonryMatrix` state
 
-- `getState()` returns a snapshot of internal service state. Its `columnsHeights` and `order` fields are cloned, so they can be read without risking damage to the instance state.
+- `getState()` returns a snapshot of service state. Its `columnsHeights` and `order` fields are cloned, so you can read them without risking damage to the internal state.
 
-### Limitations:
+### Limitations
 
 - The library has no API for removing, updating, or selectively reordering individual items.
-- The library does not work with the DOM directly. Container measurement, breakpoint choice, and rendering are up to you.
-- `recreate()` does not reuse previous `append()` batches automatically. If you need a rebuilt layout from existing source data, pass `items` explicitly.
+- The library does not work with the DOM by itself. Measuring the container, choosing breakpoints, and rendering are your responsibility.
+- `recreate()` does not automatically reuse previous items from `append()`. If you need a rebuild from source data, pass `items` explicitly.
 
 ## Errors and validation
 
-The library validates matrix parameters and filters item batches.
+The library validates matrix parameters and filters items.
 
 Invalid matrix parameters:
 
@@ -494,9 +490,9 @@ Invalid matrix parameters:
 - `gap < 0` or `gap` is not a finite number
 - `gap` leaves no positive space for columns
 
-Invalid items passed to `append()` or `recreate({ items })` do not throw. They are skipped instead. An item is skipped if its `id` is invalid, or if its `width` or `height` is not a positive finite number.
+Invalid items in `append()` or `recreate({ items })` do not throw. They are skipped instead. An item is skipped if its `id` is neither a finite number nor a non-empty string, or if its `width` or `height` is not a positive finite number.
 
-Top-level errors are exposed as `MasonryMatrixError`. The `cause` may contain the original reason, including a `Worker` error, a structured clone / `postMessage(...)` error, or an engine validation error.
+Top-level errors come as `MasonryMatrixError`. The original reason may appear inside `cause`, including a `Worker` error, a structured clone / `postMessage(...)` error, or an engine validation error.
 
 Typical top-level messages:
 
@@ -516,10 +512,10 @@ Typical internal causes in `cause`:
 pnpm test:bench
 ```
 
-Benchmark suites currently live in:
+Current benchmark suites live in:
 
-- [src/core/LayoutCalculationEngine/**test**/runtime/Matrix/Matrix.bench.ts](src/core/LayoutCalculationEngine/__test__/runtime/Matrix/Matrix.bench.ts)
-- [src/utils/**tests**/kWayMerge.bench.ts](src/utils/__tests__/kWayMerge.bench.ts)
+- [`src/core/LayoutCalculationEngine/__test__/runtime/Matrix/Matrix.bench.ts`](src/core/LayoutCalculationEngine/__test__/runtime/Matrix/Matrix.bench.ts)
+- [`src/utils/__tests__/kWayMerge.bench.ts`](src/utils/__tests__/kWayMerge.bench.ts)
 
 ## Contributing
 
@@ -531,7 +527,7 @@ See [SECURITY.md](SECURITY.md)
 
 ## License
 
-This project is licensed under MPL 2.0.
+The project is distributed under the MPL 2.0 license.
 
 ## Links
 

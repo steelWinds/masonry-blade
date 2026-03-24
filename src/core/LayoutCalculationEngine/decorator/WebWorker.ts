@@ -3,6 +3,9 @@ import type {
 	LayoutComputedUnit,
 	LayoutSnapshot,
 	LayoutSourceUnit,
+	LayoutWorkerErrorResponse,
+	LayoutWorkerRequest,
+	LayoutWorkerResponse,
 	LayoutWorkerSuccessResponse,
 } from '../contract';
 import { WEB_WORKER_ERRORS, WebWorkerError } from '../errors/WebWorkerError';
@@ -18,6 +21,7 @@ export class WebWorker<
 	private _worker?: Worker;
 	private _pendingReject?: (reason?: unknown) => void;
 	private _workerDisabled = false;
+	private _requestId = 0;
 
 	constructor(
 		engine: LayoutCalculationEngine<Return, Snapshot, Unit>,
@@ -72,8 +76,22 @@ export class WebWorker<
 		});
 	}
 
+	private _restoreWorkerError(
+		error: LayoutWorkerErrorResponse['error'],
+	): Error {
+		const restoredError = new Error(error.message);
+
+		restoredError.name = error.name;
+
+		if (error.stack != null) {
+			restoredError.stack = error.stack;
+		}
+
+		return restoredError;
+	}
+
 	private async _requestWorker<Result>(
-		message: unknown,
+		message: Omit<LayoutWorkerRequest<Return, Snapshot>, 'id'>,
 		pickResult: (
 			data: LayoutWorkerSuccessResponse<Return, Snapshot, Unit>,
 		) => Result | undefined,
@@ -92,6 +110,11 @@ export class WebWorker<
 			});
 		}
 
+		const request = {
+			...message,
+			id: ++this._requestId,
+		} as LayoutWorkerRequest<Return, Snapshot>;
+
 		return await new Promise<Result>((resolve, reject) => {
 			const cleanup = () => this._cleanupWorkerHandlers(worker);
 
@@ -101,22 +124,42 @@ export class WebWorker<
 			};
 
 			worker.onmessage = (
-				event: MessageEvent<
-					LayoutWorkerSuccessResponse<Return, Snapshot, Unit>
-				>,
+				event: MessageEvent<LayoutWorkerResponse<Return, Snapshot, Unit>>,
 			) => {
+				const response = event.data;
+
+				if (response.id !== request.id) {
+					cleanup();
+					reject(
+						new WebWorkerError(WEB_WORKER_ERRORS.WORKER_ERROR, {
+							cause: `Unexpected worker response id: ${String(response.id)}`,
+						}),
+					);
+					return;
+				}
+
+				if (!response.ok) {
+					cleanup();
+					reject(
+						new WebWorkerError(WEB_WORKER_ERRORS.WORKER_ERROR, {
+							cause: this._restoreWorkerError(response.error),
+						}),
+					);
+					return;
+				}
+
+				const result = pickResult(response);
+
 				cleanup();
 
-				const result = pickResult(event.data);
-
-				if (result !== undefined) {
+				if (result != null) {
 					resolve(result);
 					return;
 				}
 
 				reject(
 					new WebWorkerError(WEB_WORKER_ERRORS.WORKER_ERROR, {
-						cause: `Unexpected worker response type: ${String(event.data?.type)}`,
+						cause: `Unexpected worker response type: ${String(response.type)}`,
 					}),
 				);
 			};
@@ -136,7 +179,7 @@ export class WebWorker<
 			};
 
 			try {
-				worker.postMessage(message);
+				worker.postMessage(request);
 			} catch (error) {
 				cleanup();
 				reject(error);

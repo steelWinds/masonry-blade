@@ -4,6 +4,7 @@ import {
 	type LayoutComputedUnit,
 	type LayoutSnapshot,
 	type LayoutSourceUnit,
+	WEB_WORKER_ERRORS,
 	WebWorker,
 	WebWorkerError,
 } from 'src/core/LayoutCalculationEngine';
@@ -11,7 +12,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { FAKER_SEED } from 'tests/constants';
 import { faker } from '@faker-js/faker';
 
-type TestReturn = unknown;
+type TestReturn = {
+	readonly token: string;
+	readonly version: number;
+};
+
 type TestSnapshot = LayoutSnapshot<TestReturn>;
 type TestUnit = LayoutComputedUnit;
 
@@ -38,9 +43,7 @@ class FakeWorker {
 		| undefined;
 
 	public onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
-
 	public onmessageerror: ((event: MessageEvent<unknown>) => void) | null = null;
-
 	public onerror: ((event: ErrorEvent) => void) | null = null;
 
 	public readonly terminate = vi.fn();
@@ -85,6 +88,34 @@ class FakeWorker {
 
 const WORKER_PATH = './layout.worker.ts';
 
+const createInternalState = (
+	overrides: Partial<TestReturn> = {},
+): Readonly<TestReturn> => ({
+	token: overrides.token ?? faker.string.uuid(),
+	version: overrides.version ?? faker.number.int({ max: 10_000, min: 0 }),
+});
+
+const createSnapshot = (
+	overrides: Partial<TestSnapshot> = {},
+): Readonly<TestSnapshot> => ({
+	columnCount: overrides.columnCount ?? faker.number.int({ max: 8, min: 1 }),
+	gap:
+		overrides.gap ??
+		faker.number.float({
+			fractionDigits: 3,
+			max: 64,
+			min: 0,
+		}),
+	internalState: overrides.internalState ?? createInternalState(),
+	rootWidth:
+		overrides.rootWidth ??
+		faker.number.float({
+			fractionDigits: 3,
+			max: 4_000,
+			min: 1,
+		}),
+});
+
 const createSourceUnit = (
 	overrides: Partial<LayoutSourceUnit> = {},
 ): Readonly<LayoutSourceUnit> => ({
@@ -107,56 +138,46 @@ const createSourceUnit = (
 
 const createComputedUnit = (
 	overrides: Partial<TestUnit> = {},
-): Readonly<TestUnit> =>
-	({
-		height:
-			(overrides as { height?: number }).height ??
-			faker.number.float({
-				fractionDigits: 3,
-				max: 2_000,
-				min: 1,
-			}),
-		id: (overrides as { id?: string | number }).id ?? faker.string.nanoid(),
-		width:
-			(overrides as { width?: number }).width ??
-			faker.number.float({
-				fractionDigits: 3,
-				max: 2_000,
-				min: 1,
-			}),
-		x:
-			(overrides as { x?: number }).x ??
-			faker.number.float({
-				fractionDigits: 3,
-				max: 2_000,
-				min: 0,
-			}),
-		y:
-			(overrides as { y?: number }).y ??
-			faker.number.float({
-				fractionDigits: 3,
-				max: 2_000,
-				min: 0,
-			}),
-	}) as TestUnit;
-
-const createSnapshot = (): TestSnapshot =>
-	({
-		order: Array.from({ length: faker.number.int({ max: 8, min: 0 }) }, () =>
-			faker.string.nanoid(),
-		),
-		token: faker.string.uuid(),
-		version: faker.number.int({ max: 10_000, min: 0 }),
-	}) as unknown as TestSnapshot;
+): Readonly<TestUnit> => ({
+	height:
+		overrides.height ??
+		faker.number.float({
+			fractionDigits: 3,
+			max: 2_000,
+			min: 1,
+		}),
+	id: overrides.id ?? faker.string.nanoid(),
+	width:
+		overrides.width ??
+		faker.number.float({
+			fractionDigits: 3,
+			max: 2_000,
+			min: 1,
+		}),
+	x:
+		overrides.x ??
+		faker.number.float({
+			fractionDigits: 3,
+			max: 2_000,
+			min: 0,
+		}),
+	y:
+		overrides.y ??
+		faker.number.float({
+			fractionDigits: 3,
+			max: 2_000,
+			min: 0,
+		}),
+});
 
 const createEngineMock = (
-	snapshot: TestSnapshot = createSnapshot(),
+	snapshot: Readonly<TestSnapshot> = createSnapshot(),
 ): EngineMock =>
 	({
-		append: vi.fn(),
+		append: vi.fn().mockResolvedValue(snapshot.internalState),
 		fromSnapshot: vi.fn(),
 		snapshot: vi.fn().mockReturnValue(snapshot),
-		sort: vi.fn(),
+		sort: vi.fn().mockResolvedValue([]),
 	}) as unknown as EngineMock;
 
 const idArbitrary = fc.oneof(
@@ -233,6 +254,17 @@ describe('WebWorker', () => {
 		expect(engine.snapshot).toHaveBeenCalledTimes(1);
 	});
 
+	test('fromSnapshot() delegates to engine.fromSnapshot()', () => {
+		const snapshot = createSnapshot();
+		const engine = createEngineMock();
+		const worker = new WebWorker(engine, WORKER_PATH);
+
+		worker.fromSnapshot(snapshot);
+
+		expect(engine.fromSnapshot).toHaveBeenCalledTimes(1);
+		expect(engine.fromSnapshot).toHaveBeenCalledWith(snapshot);
+	});
+
 	test('append() falls back to engine.append() when Worker is unavailable', async () => {
 		vi.stubGlobal('Worker', undefined);
 
@@ -253,11 +285,11 @@ describe('WebWorker', () => {
 		vi.stubGlobal('Worker', undefined);
 
 		const snapshot = createSnapshot();
-		const source = { token: faker.string.uuid() };
+		const source = createInternalState();
 		const sorted = [createComputedUnit(), createComputedUnit()];
 		const engine = createEngineMock(snapshot);
 
-		engine.sort.mockReturnValue(sorted);
+		engine.sort.mockResolvedValue(sorted);
 
 		const worker = new WebWorker(engine, WORKER_PATH);
 		const result = await worker.sort(source);
@@ -267,14 +299,25 @@ describe('WebWorker', () => {
 		expect(result).toBe(sorted);
 	});
 
-	test('append() lazily creates worker, sends append payload, syncs engine from worker snapshot and returns it', async () => {
+	test('append() lazily creates worker, sends append payload, syncs engine from worker snapshot and returns its internal state', async () => {
 		const initialSnapshot = createSnapshot();
 		const nextSnapshot = createSnapshot();
 		const items = [createSourceUnit(), createSourceUnit()];
 		const engine = createEngineMock(initialSnapshot);
 
-		FakeWorker.onPostMessage = (instance) => {
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as {
+				id: number;
+				type: 'append';
+				payload: {
+					items: readonly Readonly<LayoutSourceUnit>[];
+					snapshot: Readonly<TestSnapshot>;
+				};
+			};
+
 			instance.emitMessage({
+				id: request.id,
+				ok: true,
 				payload: {
 					snapshot: nextSnapshot,
 				},
@@ -294,6 +337,7 @@ describe('WebWorker', () => {
 		expect(String(instance.url)).toContain('layout.worker.ts');
 		expect(instance.postMessage).toHaveBeenCalledTimes(1);
 		expect(instance.postMessage).toHaveBeenCalledWith({
+			id: 1,
 			payload: {
 				items,
 				snapshot: initialSnapshot,
@@ -308,15 +352,23 @@ describe('WebWorker', () => {
 
 	test('sort() creates worker, sends sort payload and returns worker items', async () => {
 		const snapshot = createSnapshot();
-		const source = {
-			id: faker.string.uuid(),
-			kind: faker.word.noun(),
-		};
+		const source = createInternalState();
 		const sorted = [createComputedUnit(), createComputedUnit()];
 		const engine = createEngineMock(snapshot);
 
-		FakeWorker.onPostMessage = (instance) => {
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as {
+				id: number;
+				type: 'sort';
+				payload: {
+					source: TestReturn;
+					snapshot: Readonly<TestSnapshot>;
+				};
+			};
+
 			instance.emitMessage({
+				id: request.id,
+				ok: true,
 				payload: {
 					items: sorted,
 				},
@@ -334,6 +386,7 @@ describe('WebWorker', () => {
 
 		expect(instance.postMessage).toHaveBeenCalledTimes(1);
 		expect(instance.postMessage).toHaveBeenCalledWith({
+			id: 1,
 			payload: {
 				snapshot,
 				source,
@@ -343,6 +396,67 @@ describe('WebWorker', () => {
 
 		expect(engine.fromSnapshot).not.toHaveBeenCalled();
 		expect(result).toBe(sorted);
+	});
+
+	test('append() increments request ids across multiple worker requests', async () => {
+		const initialSnapshot = createSnapshot();
+		const nextSnapshot = createSnapshot();
+		const items = [createSourceUnit()];
+		const sorted = [createComputedUnit()];
+		const source = createInternalState();
+		const engine = createEngineMock(initialSnapshot);
+
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as { id: number; type: 'append' | 'sort' };
+
+			if (request.type === 'append') {
+				instance.emitMessage({
+					id: request.id,
+					ok: true,
+					payload: {
+						snapshot: nextSnapshot,
+					},
+					type: 'append',
+				});
+				return;
+			}
+
+			instance.emitMessage({
+				id: request.id,
+				ok: true,
+				payload: {
+					items: sorted,
+				},
+				type: 'sort',
+			});
+		};
+
+		const worker = new WebWorker(engine, WORKER_PATH);
+
+		await worker.append(items);
+		await worker.sort(source);
+
+		expect(FakeWorker.instances).toHaveLength(1);
+
+		const [instance] = FakeWorker.instances;
+
+		expect(instance.postMessage).toHaveBeenNthCalledWith(1, {
+			id: 1,
+			payload: {
+				items,
+				snapshot: initialSnapshot,
+			},
+			type: 'append',
+		});
+
+		expect(instance.postMessage).toHaveBeenNthCalledWith(2, {
+			id: 2,
+			payload: {
+				snapshot: initialSnapshot,
+				source,
+			},
+			type: 'sort',
+		});
 	});
 
 	test('append() rejects with WebWorkerError and disposes worker on messageerror', async () => {
@@ -355,7 +469,10 @@ describe('WebWorker', () => {
 			instance.emitMessageError();
 		};
 
-		await expect(worker.append(items)).rejects.toBeInstanceOf(WebWorkerError);
+		await expect(worker.append(items)).rejects.toMatchObject({
+			message: WEB_WORKER_ERRORS.RECEIVE_FROM_WORKER,
+			name: 'WebWorkerError',
+		});
 
 		expect(FakeWorker.instances).toHaveLength(1);
 		expect(FakeWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
@@ -363,7 +480,7 @@ describe('WebWorker', () => {
 
 	test('sort() rejects with WebWorkerError and disposes worker on error event', async () => {
 		const snapshot = createSnapshot();
-		const source = { value: faker.string.uuid() };
+		const source = createInternalState();
 		const engine = createEngineMock(snapshot);
 		const worker = new WebWorker(engine, WORKER_PATH);
 
@@ -371,20 +488,27 @@ describe('WebWorker', () => {
 			instance.emitError(new Error('sort failed'));
 		};
 
-		await expect(worker.sort(source)).rejects.toBeInstanceOf(WebWorkerError);
+		await expect(worker.sort(source)).rejects.toMatchObject({
+			message: WEB_WORKER_ERRORS.WORKER_ERROR,
+			name: 'WebWorkerError',
+		});
 
 		expect(FakeWorker.instances).toHaveLength(1);
 		expect(FakeWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
 	});
 
-	test('append() rejects with WebWorkerError on unexpected worker response type and disposes worker', async () => {
+	test('append() rejects when worker responds with a mismatched response type', async () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
 		const worker = new WebWorker(engine, WORKER_PATH);
 
-		FakeWorker.onPostMessage = (instance) => {
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as { id: number };
+
 			instance.emitMessage({
+				id: request.id,
+				ok: true,
 				payload: {
 					items: [createComputedUnit()],
 				},
@@ -392,7 +516,81 @@ describe('WebWorker', () => {
 			});
 		};
 
-		await expect(worker.append(items)).rejects.toBeInstanceOf(WebWorkerError);
+		await expect(worker.append(items)).rejects.toMatchObject({
+			message: WEB_WORKER_ERRORS.WORKER_ERROR,
+			name: 'WebWorkerError',
+		});
+
+		expect(FakeWorker.instances).toHaveLength(1);
+		expect(FakeWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
+	});
+
+	test('append() rejects when worker responds with an unexpected response id', async () => {
+		const snapshot = createSnapshot();
+		const items = [createSourceUnit()];
+		const engine = createEngineMock(snapshot);
+		const worker = new WebWorker(engine, WORKER_PATH);
+
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as { id: number };
+
+			instance.emitMessage({
+				id: request.id + 1,
+				ok: true,
+				payload: {
+					snapshot: createSnapshot(),
+				},
+				type: 'append',
+			});
+		};
+
+		await expect(worker.append(items)).rejects.toMatchObject({
+			message: WEB_WORKER_ERRORS.WORKER_ERROR,
+			name: 'WebWorkerError',
+		});
+
+		expect(FakeWorker.instances).toHaveLength(1);
+		expect(FakeWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
+	});
+
+	test('append() restores worker error payload into cause when worker responds with ok=false', async () => {
+		const snapshot = createSnapshot();
+		const items = [createSourceUnit()];
+		const engine = createEngineMock(snapshot);
+		const worker = new WebWorker(engine, WORKER_PATH);
+
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as { id: number };
+
+			instance.emitMessage({
+				error: {
+					message: 'Computation failed',
+					name: 'RangeError',
+					stack: 'RangeError: Computation failed\n    at worker:1:1',
+				},
+				id: request.id,
+				ok: false,
+				type: 'append',
+			});
+		};
+
+		try {
+			await worker.append(items);
+		} catch (error) {
+			expect(error).toBeInstanceOf(WebWorkerError);
+			expect(error).toMatchObject({
+				message: WEB_WORKER_ERRORS.WORKER_ERROR,
+				name: 'WebWorkerError',
+			});
+
+			const { cause } = error as WebWorkerError;
+
+			expect(cause).toBeInstanceOf(Error);
+			expect(cause).toMatchObject({
+				message: 'Computation failed',
+				name: 'RangeError',
+			});
+		}
 
 		expect(FakeWorker.instances).toHaveLength(1);
 		expect(FakeWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
@@ -405,7 +603,7 @@ describe('WebWorker', () => {
 		const worker = new WebWorker(engine, WORKER_PATH);
 
 		FakeWorker.onPostMessage = () => {
-			// Intentionally keep request pending
+			// Keep request pending intentionally
 		};
 
 		const promise = worker.append(items);
@@ -413,7 +611,10 @@ describe('WebWorker', () => {
 		await Promise.resolve();
 		worker.terminate();
 
-		await expect(promise).rejects.toBeInstanceOf(WebWorkerError);
+		await expect(promise).rejects.toMatchObject({
+			message: WEB_WORKER_ERRORS.WORKER_TERMINATED,
+			name: 'WebWorkerError',
+		});
 
 		expect(FakeWorker.instances).toHaveLength(1);
 		expect(FakeWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
@@ -427,6 +628,7 @@ describe('WebWorker', () => {
 
 		worker.enable();
 
+		expect(worker.workerCreated).toBe(true);
 		expect(FakeWorker.constructionAttempts).toBe(1);
 		expect(FakeWorker.instances).toHaveLength(1);
 
@@ -434,6 +636,8 @@ describe('WebWorker', () => {
 
 		worker.disable();
 
+		expect(worker.workerDisabled).toBe(true);
+		expect(worker.workerCreated).toBe(false);
 		expect(instance.terminate).toHaveBeenCalledTimes(1);
 
 		const result = await worker.append(items);
@@ -449,6 +653,8 @@ describe('WebWorker', () => {
 		const worker = new WebWorker(engine, WORKER_PATH);
 
 		worker.enable();
+		expect(worker.workerDisabled).toBe(false);
+		expect(worker.workerCreated).toBe(true);
 		expect(FakeWorker.constructionAttempts).toBe(1);
 
 		const [first] = FakeWorker.instances;
@@ -457,6 +663,8 @@ describe('WebWorker', () => {
 		expect(first.terminate).toHaveBeenCalledTimes(1);
 
 		worker.enable();
+		expect(worker.workerDisabled).toBe(false);
+		expect(worker.workerCreated).toBe(true);
 		expect(FakeWorker.constructionAttempts).toBe(2);
 		expect(FakeWorker.instances).toHaveLength(2);
 	});
@@ -465,10 +673,10 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const sorted = [createComputedUnit()];
 		const items = [createSourceUnit()];
-		const source = { sourceId: faker.string.uuid() };
+		const source = createInternalState();
 		const engine = createEngineMock(snapshot);
 
-		engine.sort.mockReturnValue(sorted);
+		engine.sort.mockResolvedValue(sorted);
 
 		FakeWorker.constructShouldThrow = true;
 
@@ -477,6 +685,8 @@ describe('WebWorker', () => {
 		const appendResult = await worker.append(items);
 		const sortResult = await worker.sort(source);
 
+		expect(worker.workerDisabled).toBe(true);
+		expect(worker.workerCreated).toBe(false);
 		expect(FakeWorker.constructionAttempts).toBe(1);
 		expect(engine.append).toHaveBeenCalledWith(items);
 		expect(engine.sort).toHaveBeenCalledWith(source);
@@ -487,8 +697,46 @@ describe('WebWorker', () => {
 
 		worker.enable();
 
+		expect(worker.workerDisabled).toBe(false);
+		expect(worker.workerCreated).toBe(true);
 		expect(FakeWorker.constructionAttempts).toBe(2);
 		expect(FakeWorker.instances).toHaveLength(1);
+	});
+
+	test('append() rejects concurrent worker requests', async () => {
+		const snapshot = createSnapshot();
+		const itemsA = [createSourceUnit()];
+		const itemsB = [createSourceUnit()];
+		const engine = createEngineMock(snapshot);
+		const worker = new WebWorker(engine, WORKER_PATH);
+
+		let resolveFirst: (() => void) | undefined;
+
+		FakeWorker.onPostMessage = (instance, message) => {
+			const request = message as { id: number; type: 'append' };
+
+			resolveFirst = () => {
+				instance.emitMessage({
+					id: request.id,
+					ok: true,
+					payload: {
+						snapshot: createSnapshot(),
+					},
+					type: 'append',
+				});
+			};
+		};
+
+		const firstPromise = worker.append(itemsA);
+
+		expect(worker.append(itemsB)).rejects.toMatchObject({
+			message: WEB_WORKER_ERRORS.WORKER_ERROR,
+			name: 'WebWorkerError',
+		});
+
+		resolveFirst?.();
+
+		await expect(firstPromise).resolves.toBeDefined();
 	});
 
 	test('append() forwards arbitrary readonly arrays to fallback engine', async () => {
@@ -523,22 +771,16 @@ describe('WebWorker', () => {
 
 		await fc.assert(
 			fc.asyncProperty(
-				fc.anything({
-					maxDepth: 3,
-					withBigInt: false,
-					withDate: false,
-					withMap: false,
-					withObjectString: false,
-					withSet: false,
-					withSparseArray: false,
-					withTypedArray: false,
+				fc.record({
+					token: fc.string({ maxLength: 64 }),
+					version: fc.integer(),
 				}),
 				fc.array(computedUnitArbitrary, {
 					maxLength: 20,
 				}),
 				async (source, sortedItems) => {
 					const engine = createEngineMock();
-					engine.sort.mockReturnValue(sortedItems);
+					engine.sort.mockResolvedValue(sortedItems);
 
 					const worker = new WebWorker(engine, WORKER_PATH);
 					const result = await worker.sort(source);
