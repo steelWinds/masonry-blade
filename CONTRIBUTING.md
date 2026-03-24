@@ -11,6 +11,7 @@ Please check:
 - Existing issues and pull requests
 - The current README and public API behavior
 - Whether your change is a bug fix, a test improvement, a documentation improvement, or a narrowly scoped feature
+- Check our PR or issue public templates
 
 For security issues, please do not open a public issue. See `SECURITY.md`.
 
@@ -18,7 +19,7 @@ For security issues, please do not open a public issue. See `SECURITY.md`.
 
 ### Requirements
 
-- Node.js `>=20.19.0`
+- Node.js `>=22.18.0`
 - `pnpm`
 
 ### Install
@@ -40,13 +41,14 @@ pnpm lint
 pnpm lint:fix
 pnpm fmt
 pnpm fmt:check
-pnpm benchmark
+pnpm test:bench
 ```
 
 Notes:
 
 - `pnpm test` is useful during development if you want the default interactive test workflow.
 - `pnpm test:run` is the non-interactive test command used for validation and CI-style checks.
+- `pnpm test:bench` runs the repository benchmark suites.
 
 ## Project boundaries
 
@@ -56,7 +58,7 @@ It is:
 
 - A masonry layout engine
 - Framework-agnostic
-- Focused on source sizes, coordinates, and replayable layout state
+- Focused on source sizes, coordinates, and explicit rebuild inputs
 - Designed around a single public runtime facade: `MasonryMatrix`
 
 It is not:
@@ -94,7 +96,7 @@ Avoid changes that:
 - Add implicit or hard-to-explain behavior
 - Make internal state harder to reason about
 - Couple the project to a specific framework or rendering strategy
-- Weaken guarantees around deterministic output, replayed state, or worker fallback
+- Weaken guarantees around deterministic output, explicit rebuild behavior, or worker fallback
 
 ### Add tests for behavior changes
 
@@ -104,8 +106,9 @@ Especially useful tests cover:
 
 - Invalid constructor arguments
 - Invalid item size handling
-- Append and recreate flows
-- Replay of remembered raw items after `recreate(...)`
+- Append, sort, and recreate flows
+- `recreate({ ... })` with and without explicit `items`
+- `sort(source)` ordering and non-mutating behavior
 - Preservation of `columnCount` and `gap` after a successful recreate
 - `meta` passthrough
 - Readonly return shape guarantees
@@ -113,7 +116,6 @@ Especially useful tests cover:
 - `enableWorker()`, `disableWorker()`, and `terminateWorker()` behavior
 - Serialization and structured-clone expectations in worker mode
 - Empty-state and zero-item edge cases
-- Non-concurrent call expectations on a single instance
 - Snapshot integrity of internal state returned by `getState()`
 
 ### Be careful with performance claims
@@ -121,7 +123,7 @@ Especially useful tests cover:
 If a change improves performance, include at least one of the following:
 
 - a reproducible measurement
-- a benchmark update
+- a benchmark run or benchmark-suite change when relevant
 - a short explanation of the trade-off
 
 Do not trade away readability or API clarity for tiny gains unless the benefit is clear.
@@ -135,7 +137,7 @@ That usually means updating one or more of:
 - `README.md`
 - `README.ru.md`
 - Public API examples
-- JSDoc for public APIs
+- Inline docs or comments for public APIs, if present
 
 ## Pull requests
 
@@ -153,7 +155,7 @@ pnpm build
 If your changes affect performance-critical code, please include benchmark results in the pull request description by running:
 
 ```bash
-pnpm benchmark
+pnpm test:bench
 ```
 
 ### What a good PR looks like
@@ -199,7 +201,7 @@ When proposing a feature, explain:
 - The problem
 - Why the current API is not enough
 - The smallest useful addition
-- Whether the feature affects worker mode, replayed state, return shapes, or determinism
+- Whether the feature affects worker mode, `sort(source)` semantics, `recreate({ ... })` semantics, return shapes, or determinism
 
 ## Documentation contributions
 

@@ -10,15 +10,16 @@ export default defineConfig({
 		profile: 'esm-only',
 	},
 	define: {
-		'import.meta.env.MATRIX_ENGINE_WORKER': JSON.stringify('./worker.js'),
+		'import.meta.env.MATRIX_ENGINE_WORKER': JSON.stringify('./matrixWorker.js'),
 	},
 	dts: true,
 	entry: {
 		index: './src',
-		worker: './src/services/MatrixEngine',
+		matrixWorker:
+			'./src/core/LayoutCalculationEngine/runtime/Matrix/MatrixWorker.worker.ts',
 	},
 	exports: {
-		exclude: ['worker'],
+		exclude: ['matrixWorker'],
 	},
 	format: ['esm'],
 	ignoreWatch: ['node_modules', 'build', '__tests__'],

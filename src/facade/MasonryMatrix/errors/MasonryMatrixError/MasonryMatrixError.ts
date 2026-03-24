@@ -8,7 +8,9 @@ export class MasonryMatrixError extends Error {
 
 	constructor(
 		message: MasonryMatrixErrorMessage,
-		options?: { cause?: unknown },
+		options?: {
+			cause?: unknown;
+		},
 	) {
 		super(message);
 

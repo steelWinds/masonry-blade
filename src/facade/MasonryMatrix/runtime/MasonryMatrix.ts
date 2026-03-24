@@ -1,210 +1,122 @@
 import { MASONRY_MATRIX_ERROR_MESSAGES, MasonryMatrixError } from '../errors';
 import type { MasonryMatrixState, RecreateOptions } from '../contract';
-import type {
-	MatrixState,
-	SourceItem,
-	WithMeta,
-} from 'src/core/MatrixEngine/contract';
-import { appendToMatrix, createMatrixState } from 'src/core/MatrixEngine';
+import {
+	Matrix,
+	type MatrixComputedUnit,
+	type MatrixSnapshot,
+	type MatrixSourceUnit,
+	type ReadonlyMatrix,
+	type ReadonlySortItems,
+	WebWorker,
+} from 'src/core/LayoutCalculationEngine';
 
-/**
- * A small facade over the matrix engine that builds and rebuilds masonry layouts
- * from source item sizes.
- *
- * Features:
- * - appends items incrementally without losing the current layout
- * - recreates the whole matrix from explicitly provided source items
- * - optionally offloads calculations to a Web Worker when available
- * - falls back to synchronous calculation when Worker is unavailable or disabled
- *
- * Important:
- * - internal state is mutable
- * - returned columns must be treated as read-only by the caller
- * - append() and recreate() must not be called concurrently
- * - recreate() does not reuse or replay previously appended source items
- * - when Worker mode is used, payload data must be structured-cloneable
- * - terminateWorker(), disableWorker(), and enableWorker() may interrupt
- *   an in-flight worker-based calculation
- *
- * @template T Type of optional meta attached to every source and matrix item.
- */
+export class MasonryMatrix<Meta = undefined> {
+	private readonly _engine: WebWorker<
+		ReadonlyMatrix<Meta>,
+		MatrixSnapshot<Meta>,
+		MatrixComputedUnit<Meta>
+	>;
 
-export class MasonryMatrix<T = never> {
-	private _worker?: Worker;
-	private _workerTerminatedSignal?: (reason?: unknown) => void;
-	private _workerDisabled: boolean;
-	private _state: MatrixState<T>;
-	private _inFlight: boolean;
-
-	constructor(rootWidth: number, columnCount: number = 1, gap: number = 0) {
-		this._inFlight = false;
-		this._workerDisabled = false;
-		this._state = createMatrixState<T>(rootWidth, columnCount, gap);
-	}
-
-	private _createWorker() {
-		if (globalThis && !('Worker' in globalThis)) {
-			this.disableWorker();
-			return;
-		}
-
-		try {
-			this._worker = new Worker(
-				new URL(import.meta.env.MATRIX_ENGINE_WORKER, import.meta.url),
-				{ type: 'module' },
-			);
-		} catch {
-			this.disableWorker();
-		}
-	}
-
-	private _workerTerminateCleanup() {
-		this._workerTerminatedSignal = undefined;
-	}
-
-	private _disposeWorker() {
-		this._worker?.terminate();
-		this._workerTerminateCleanup();
-		this._worker = undefined;
-	}
-
-	private async _updateState(
-		state: MatrixState<T>,
-		batchItems: readonly WithMeta<SourceItem, T>[],
-	) {
-		try {
-			if (this._worker == null && !this._workerDisabled) {
-				this._createWorker();
-			}
-
-			if (this._worker == null) {
-				return appendToMatrix(state, batchItems);
-			}
-
-			return await new Promise<MatrixState<T>>((resolve, reject) => {
-				this._workerTerminatedSignal = reject;
-
-				this._worker!.onmessage = (e: MessageEvent<MatrixState<T>>) => {
-					this._workerTerminateCleanup();
-					resolve(e.data);
-				};
-
-				this._worker!.onmessageerror = () => {
-					reject(
-						new MasonryMatrixError(
-							MASONRY_MATRIX_ERROR_MESSAGES.RECEIVE_FROM_WORKER,
-						),
-					);
-				};
-
-				this._worker!.onerror = (e: ErrorEvent) => {
-					reject(
-						new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.WORKER_ERROR, {
-							cause: e,
-						}),
-					);
-				};
-
-				this._worker!.postMessage({ batchItems, state });
-			});
-		} catch (e: unknown) {
-			this._disposeWorker();
-
-			throw new MasonryMatrixError(
-				MASONRY_MATRIX_ERROR_MESSAGES.UPDATE_INTERNAL_STATE,
-				{
-					cause: e,
-				},
-			);
-		}
-	}
-
-	terminateWorker() {
-		this._workerTerminatedSignal?.(
-			new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.WORKER_TERMINATED),
+	constructor(...args: ConstructorParameters<typeof Matrix<Meta>>) {
+		this._engine = new WebWorker<
+			ReadonlyMatrix<Meta>,
+			MatrixSnapshot<Meta>,
+			MatrixComputedUnit<Meta>
+		>(
+			new Matrix(...args),
+			new URL(import.meta.env.MATRIX_ENGINE_WORKER, import.meta.url).href,
 		);
-		this._disposeWorker();
 	}
 
-	disableWorker() {
-		this.terminateWorker();
+	private _restoreMatrix(
+		snapshot: Readonly<MatrixSnapshot<Meta>>,
+	): Matrix<Meta> {
+		const matrix = new Matrix<Meta>(
+			snapshot.rootWidth,
+			snapshot.columnCount,
+			snapshot.gap,
+		);
 
-		this._workerDisabled = true;
+		matrix.fromSnapshot(snapshot);
+
+		return matrix;
 	}
 
-	enableWorker() {
-		this.terminateWorker();
-
-		this._workerDisabled = false;
-
-		this._createWorker();
+	public terminateWorker(): void {
+		this._engine.terminate();
 	}
 
-	getState(): MasonryMatrixState {
+	public disableWorker(): void {
+		this._engine.disable();
+	}
+
+	public enableWorker(): void {
+		this._engine.enable();
+	}
+
+	public getState(): MasonryMatrixState {
+		const snapshot = this._engine.snapshot();
+
 		return {
-			columnCount: this._state.columnCount,
-			columnWidth: this._state.columnWidth,
-			columnsHeights: new Float64Array(this._state.columnsHeights),
-			gap: this._state.gap,
-			order: new Uint32Array(this._state.order),
-			workerCreated: this._worker != null,
-			workerDisabled: this._workerDisabled,
+			columnCount: snapshot.columnCount,
+			columnWidth: snapshot.columnWidth,
+			columnsHeights: new Float64Array(snapshot.columnHeights),
+			gap: snapshot.gap,
+			order: new Uint32Array(snapshot.order),
+			workerCreated: this._engine.workerCreated,
+			workerDisabled: this._engine.workerDisabled,
 		};
 	}
 
-	async append(items: readonly WithMeta<SourceItem, T>[]) {
-		if (this._inFlight) {
-			throw new MasonryMatrixError(
-				MASONRY_MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
-			);
-		}
-
-		this._inFlight = true;
-
+	public async append(
+		items: readonly Readonly<MatrixSourceUnit<Meta>>[],
+	): Promise<ReadonlyMatrix<Meta>> {
 		try {
-			this._state = await this._updateState(this._state, items);
-
-			return this._state.columns;
-		} catch (e: unknown) {
+			return await this._engine.append(items);
+		} catch (error: unknown) {
 			throw new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.APPEND_ITEMS, {
-				cause: e,
+				cause: error,
 			});
-		} finally {
-			this._inFlight = false;
 		}
 	}
 
-	async recreate(options: RecreateOptions<T>) {
-		if (this._inFlight) {
-			throw new MasonryMatrixError(
-				MASONRY_MATRIX_ERROR_MESSAGES.CONCURRENT_CALL,
-			);
+	public async sort(
+		source: ReadonlyMatrix<Meta>,
+	): Promise<ReadonlySortItems<Meta>> {
+		try {
+			return await this._engine.sort(source);
+		} catch (error: unknown) {
+			throw new MasonryMatrixError(MASONRY_MATRIX_ERROR_MESSAGES.SORT_MATRIX, {
+				cause: error,
+			});
 		}
+	}
 
-		this._inFlight = true;
+	public async recreate(
+		options: RecreateOptions<Meta>,
+	): Promise<ReadonlyMatrix<Meta>> {
+		const previousSnapshot = this._engine.snapshot();
+
+		const { rootWidth, columnCount, gap, items } = options;
+
+		const newColumnCount = columnCount ?? previousSnapshot.columnCount;
+		const newGap = gap ?? previousSnapshot.gap;
 
 		try {
-			const { items, rootWidth, columnCount, gap } = options;
-
-			this._state = await this._updateState(
-				createMatrixState<T>(
-					rootWidth,
-					columnCount ?? this._state.columnCount,
-					gap ?? this._state.gap,
-				),
-				items,
+			this._engine.setEngine(
+				new Matrix<Meta>(rootWidth, newColumnCount, newGap),
 			);
 
-			return this._state.columns;
-		} catch (e: unknown) {
+			return await this._engine.append(items ?? []);
+		} catch (error: unknown) {
+			this._engine.setEngine(this._restoreMatrix(previousSnapshot));
+
 			throw new MasonryMatrixError(
 				MASONRY_MATRIX_ERROR_MESSAGES.RECREATE_MATRIX,
 				{
-					cause: e,
+					cause: error,
 				},
 			);
-		} finally {
-			this._inFlight = false;
 		}
 	}
 }
