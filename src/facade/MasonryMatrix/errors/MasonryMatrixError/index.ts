@@ -1,2 +1,2 @@
-export { MASONRY_MATRIX_ERROR_MESSAGES } from './MasonryMatrixError.constants.ts';
-export { MasonryMatrixError } from './MasonryMatrixError.ts';
+export * from './MasonryMatrixError';
+export * from './MasonryMatrixError.constants';
