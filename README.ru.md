@@ -47,7 +47,8 @@ pnpm add masonry-blade
 
 - `MasonryMatrix` - основной фасад
 - `MasonryMatrixError` и `MASONRY_MATRIX_ERROR_MESSAGES` - ошибки и константы фасада
-- TypeScript-типы: `MasonryMatrixErrorMessage`, `MasonryMatrixState` и `RecreateOptions`
+- Masonry TS типы: `MasonryMatrixErrorMessage`, `MasonryMatrixState` и `RecreateOptions`
+- Engine TS типы: `MatrixSourceUnit`, `MatrixComputedUnit`, `ReadonlySortItems`, `ReadonlyMatrix` и `MatrixSnapshot`
 
 ```ts
 import {
