@@ -27,5 +27,4 @@ export default defineConfig({
 	platform: 'neutral',
 	plugins: [removePlugin({ consoleType: ['log', 'warn', 'debug', 'info'] })],
 	publint: true,
-	shims: true,
 });
