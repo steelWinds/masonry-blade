@@ -54,6 +54,11 @@ import {
 	MasonryMatrix,
 	MasonryMatrixError,
 	MASONRY_MATRIX_ERROR_MESSAGES,
+	type MatrixSourceUnit,
+	type MatrixComputedUnit,
+	type ReadonlySortItems,
+	type ReadonlyMatrix,
+	type MatrixSnapshot,
 	type MasonryMatrixErrorMessage,
 	type MasonryMatrixState,
 	type RecreateOptions,
@@ -136,6 +141,8 @@ Input items are plain objects with this shape:
 	height: number;
 	meta?: Meta;
 }
+
+// MatrixComputedUnit<Meta>
 ```
 
 `append()` and `recreate()` return a matrix with this shape:
@@ -149,6 +156,8 @@ readonly (readonly Readonly<{
 	y: number;
 	meta?: Meta;
 }>[])[]
+
+// ReadonlyMatrix<Meta>
 ```
 
 `sort()` returns a flat list with this shape:
@@ -162,6 +171,8 @@ readonly Readonly<{
 	y: number;
 	meta?: Meta;
 }>[]
+
+// ReadonlySortItems<Meta>
 ```
 
 If you create `new MasonryMatrix<Meta>(...)`, any provided `meta` value is typed as `Meta`, and output items keep the same `meta`.
