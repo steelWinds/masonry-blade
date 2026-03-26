@@ -19,7 +19,7 @@ For security issues, please do not open a public issue. See `SECURITY.md`.
 
 ### Requirements
 
-- Node.js `>=22.18.0`
+- Node.js `>=22.22.2`
 - `pnpm`
 
 ### Install
