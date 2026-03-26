@@ -37,7 +37,7 @@
 		"./package.json": "./package.json"
 	},
 	"scripts": {
-		"build": "tsdown --minify --log-level error",
+		"build": "tsdown --minify",
 		"build:watch": "tsdown --sourcemap --watch",
 		"test": "vitest",
 		"test:bench": "vitest bench",
