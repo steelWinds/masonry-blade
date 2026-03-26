@@ -54,6 +54,11 @@ import {
 	MasonryMatrix,
 	MasonryMatrixError,
 	MASONRY_MATRIX_ERROR_MESSAGES,
+	type MatrixSourceUnit,
+	type MatrixComputedUnit,
+	type ReadonlySortItems,
+	type ReadonlyMatrix,
+	type MatrixSnapshot,
 	type MasonryMatrixErrorMessage,
 	type MasonryMatrixState,
 	type RecreateOptions,
@@ -136,6 +141,8 @@ const state = matrix.getState();
 	height: number;
 	meta?: Meta;
 }
+
+// MatrixComputedUnit<Meta>
 ```
 
 `append()` и `recreate()` возвращают матрицу такой формы:
@@ -149,6 +156,8 @@ readonly (readonly Readonly<{
 	y: number;
 	meta?: Meta;
 }>[])[]
+
+// ReadonlyMatrix<Meta>
 ```
 
 `sort()` возвращает плоский список такой формы:
@@ -162,6 +171,8 @@ readonly Readonly<{
 	y: number;
 	meta?: Meta;
 }>[]
+
+// ReadonlySortItems<Meta>
 ```
 
 Если вы создаёте `new MasonryMatrix<Meta>(...)`, любое переданное `meta` будет типизировано как `Meta`, а выходные элементы сохранят то же `meta`.
