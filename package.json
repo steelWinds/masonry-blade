@@ -1,6 +1,6 @@
 {
 	"name": "masonry-blade",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"private": false,
 	"description": "masonry-blade is a tiny, fast, and extensible engine for masonry grid calculation with zero dependencies 🤤",
 	"keywords": [
