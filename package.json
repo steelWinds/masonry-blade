@@ -22,7 +22,7 @@
 	"author": "steelWinds",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/steelWinds/masonry-blade"
+		"url": "git+https://github.com/steelWinds/masonry-blade.git"
 	},
 	"files": [
 		"build",
