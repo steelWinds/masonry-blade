@@ -63,14 +63,11 @@
 		"oxlint": "^1.56.0",
 		"oxlint-tsgolint": "^0.17.1",
 		"publint": "^0.3.18",
-		"tsdown": "0.21.2",
+		"tsdown": "^0.21.4",
 		"tsx": "^4.21.0",
 		"typescript": "~5.9.3",
 		"unplugin-remove": "^1.0.3",
 		"vitest": "^4.1.1"
-	},
-	"overrides": {
-		"tsdown": "0.21.4"
 	},
 	"nano-staged": {
 		"*": "oxfmt --no-error-on-unmatched-pattern",
