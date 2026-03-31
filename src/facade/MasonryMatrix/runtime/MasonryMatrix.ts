@@ -1,5 +1,9 @@
-import { MASONRY_MATRIX_ERROR_MESSAGES, MasonryMatrixError } from '../errors';
-import type { MasonryMatrixState, RecreateOptions } from '../contract';
+import {
+	MASONRY_MATRIX_ERROR_MESSAGES,
+	MasonryMatrixError,
+	type MasonryMatrixState,
+	type RecreateOptions,
+} from 'src/facade/MasonryMatrix';
 import {
 	Matrix,
 	type MatrixComputedUnit,
@@ -8,6 +12,7 @@ import {
 	type ReadonlyMatrix,
 	type ReadonlySortItems,
 	WebWorker,
+	getInlineMatrixWorkerURL,
 } from 'src/core/LayoutCalculationEngine';
 
 export class MasonryMatrix<Meta = undefined> {
@@ -22,10 +27,7 @@ export class MasonryMatrix<Meta = undefined> {
 			ReadonlyMatrix<Meta>,
 			MatrixSnapshot<Meta>,
 			MatrixComputedUnit<Meta>
-		>(
-			new Matrix(...args),
-			new URL(import.meta.env.MATRIX_ENGINE_WORKER, import.meta.url).href,
-		);
+		>(new Matrix(...args), getInlineMatrixWorkerURL());
 	}
 
 	private _restoreMatrix(

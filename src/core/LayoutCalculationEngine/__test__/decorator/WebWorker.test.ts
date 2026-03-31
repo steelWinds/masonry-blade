@@ -728,8 +728,7 @@ describe('WebWorker', () => {
 		};
 
 		const firstPromise = worker.append(itemsA);
-
-		expect(worker.append(itemsB)).rejects.toMatchObject({
+		const secondPromise = expect(worker.append(itemsB)).rejects.toMatchObject({
 			message: WEB_WORKER_ERRORS.WORKER_ERROR,
 			name: 'WebWorkerError',
 		});
@@ -737,6 +736,7 @@ describe('WebWorker', () => {
 		resolveFirst?.();
 
 		await expect(firstPromise).resolves.toBeDefined();
+		await secondPromise;
 	});
 
 	test('append() forwards arbitrary readonly arrays to fallback engine', async () => {

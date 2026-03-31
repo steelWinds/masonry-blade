@@ -120,11 +120,9 @@ const REPLACEMENT_ITEMS: readonly Readonly<MatrixSourceUnit<TestMeta>>[] = [
 describe('MasonryMatrix', () => {
 	beforeEach(() => {
 		FakeWorker.reset();
-		vi.stubEnv('MATRIX_ENGINE_WORKER', './matrixWorker.test.js');
 	});
 
 	afterEach(() => {
-		vi.unstubAllEnvs();
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 		FakeWorker.reset();
@@ -247,7 +245,7 @@ describe('MasonryMatrix', () => {
 		const [worker] = FakeWorker.instances;
 
 		expect(worker.options).toStrictEqual({ type: 'module' });
-		expect(String(worker.scriptURL)).toContain('matrixWorker.test.js');
+		expect(worker.scriptURL.searchParams.get('masonry-blade-worker')).toBe('1');
 		expect(worker.postMessage).toHaveBeenCalledWith({
 			id: 1,
 			payload: {
