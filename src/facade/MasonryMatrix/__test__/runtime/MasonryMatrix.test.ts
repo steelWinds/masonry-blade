@@ -9,77 +9,89 @@ import {
 } from 'src/core/LayoutCalculationEngine';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+const workerModule = vi.hoisted(() => {
+	class FakeWorker {
+		public static instances: FakeWorker[] = [];
+
+		public options?: { name?: string };
+		public lastMessage?: unknown;
+
+		public onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+		public onmessageerror: ((event: MessageEvent<unknown>) => void) | null =
+			null;
+		public onerror: ((event: ErrorEvent) => void) | null = null;
+
+		public readonly postMessage = vi.fn((message: unknown) => {
+			this.lastMessage = message;
+		});
+
+		public readonly terminate = vi.fn();
+
+		constructor(options?: { name?: string }) {
+			this.options = options;
+			FakeWorker.instances.push(this);
+		}
+
+		private get requestId(): number {
+			const id = (this.lastMessage as { id?: unknown } | undefined)?.id;
+
+			if (typeof id !== 'number') {
+				throw new Error('FakeWorker expected request id in lastMessage');
+			}
+
+			return id;
+		}
+
+		public emitAppend(snapshot: Readonly<MatrixSnapshot<unknown>>): void {
+			this.onmessage?.({
+				data: {
+					id: this.requestId,
+					ok: true,
+					payload: {
+						snapshot,
+					},
+					type: 'append',
+				},
+			} as MessageEvent<unknown>);
+		}
+
+		public emitSort(items: readonly unknown[]): void {
+			this.onmessage?.({
+				data: {
+					id: this.requestId,
+					ok: true,
+					payload: {
+						items,
+					},
+					type: 'sort',
+				},
+			} as MessageEvent<unknown>);
+		}
+
+		public emitMessageError(): void {
+			this.onmessageerror?.({} as MessageEvent<unknown>);
+		}
+
+		public static reset(): void {
+			FakeWorker.instances = [];
+		}
+	}
+
+	return { FakeWorker };
+});
+
+const { FakeWorker } = workerModule;
+
+vi.mock(
+	'src/core/LayoutCalculationEngine/runtime/Matrix/MatrixWorker.worker.ts?worker&inline',
+	() => ({
+		default: workerModule.FakeWorker,
+	}),
+);
+
 type TestMeta = {
 	readonly label: string;
 };
-
-class FakeWorker {
-	public static instances: FakeWorker[] = [];
-
-	public scriptURL: URL;
-	public options?: WorkerOptions;
-	public lastMessage?: unknown;
-
-	public onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
-	public onmessageerror: ((event: MessageEvent<unknown>) => void) | null = null;
-	public onerror: ((event: ErrorEvent) => void) | null = null;
-
-	public readonly postMessage = vi.fn((message: unknown) => {
-		this.lastMessage = message;
-	});
-
-	public readonly terminate = vi.fn();
-
-	constructor(scriptURL: URL, options?: WorkerOptions) {
-		this.scriptURL = scriptURL;
-		this.options = options;
-		FakeWorker.instances.push(this);
-	}
-
-	private get requestId(): number {
-		const id = (this.lastMessage as { id?: unknown } | undefined)?.id;
-
-		if (typeof id !== 'number') {
-			throw new Error('FakeWorker expected request id in lastMessage');
-		}
-
-		return id;
-	}
-
-	public emitAppend(snapshot: Readonly<MatrixSnapshot<unknown>>): void {
-		this.onmessage?.({
-			data: {
-				id: this.requestId,
-				ok: true,
-				payload: {
-					snapshot,
-				},
-				type: 'append',
-			},
-		} as MessageEvent<unknown>);
-	}
-
-	public emitSort(items: readonly unknown[]): void {
-		this.onmessage?.({
-			data: {
-				id: this.requestId,
-				ok: true,
-				payload: {
-					items,
-				},
-				type: 'sort',
-			},
-		} as MessageEvent<unknown>);
-	}
-
-	public emitMessageError(): void {
-		this.onmessageerror?.({} as MessageEvent<unknown>);
-	}
-
-	public static reset(): void {
-		FakeWorker.instances = [];
-	}
-}
 
 const INITIAL_ITEMS: readonly Readonly<MatrixSourceUnit<TestMeta>>[] = [
 	{
@@ -244,8 +256,7 @@ describe('MasonryMatrix', () => {
 
 		const [worker] = FakeWorker.instances;
 
-		expect(worker.options).toStrictEqual({ type: 'module' });
-		expect(worker.scriptURL.searchParams.get('masonry-blade-worker')).toBe('1');
+		expect(worker.options).toBeUndefined();
 		expect(worker.postMessage).toHaveBeenCalledWith({
 			id: 1,
 			payload: {

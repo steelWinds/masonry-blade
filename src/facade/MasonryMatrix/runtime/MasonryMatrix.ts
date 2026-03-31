@@ -12,8 +12,8 @@ import {
 	type ReadonlyMatrix,
 	type ReadonlySortItems,
 	WebWorker,
-	getInlineMatrixWorkerURL,
 } from 'src/core/LayoutCalculationEngine';
+import MatrixWorker from 'src/core/LayoutCalculationEngine/runtime/Matrix/MatrixWorker.worker.ts?worker&inline';
 
 export class MasonryMatrix<Meta = undefined> {
 	private readonly _engine: WebWorker<
@@ -27,7 +27,7 @@ export class MasonryMatrix<Meta = undefined> {
 			ReadonlyMatrix<Meta>,
 			MatrixSnapshot<Meta>,
 			MatrixComputedUnit<Meta>
-		>(new Matrix(...args), getInlineMatrixWorkerURL());
+		>(new Matrix(...args), MatrixWorker);
 	}
 
 	private _restoreMatrix(

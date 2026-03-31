@@ -1,5 +1,6 @@
 import { defineConfig } from 'tsdown';
 import removePlugin from 'unplugin-remove/esbuild';
+import workerPlugins from 'tsdown-plugin-worker';
 
 export default defineConfig({
 	alias: {
@@ -20,6 +21,9 @@ export default defineConfig({
 		codeSplitting: false,
 	},
 	platform: 'neutral',
-	plugins: [removePlugin({ consoleType: ['log', 'warn', 'debug', 'info'] })],
+	plugins: [
+		workerPlugins({ format: 'es' }),
+		removePlugin({ consoleType: ['log', 'warn', 'debug', 'info'] }),
+	],
 	publint: true,
 });

@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"target": "ES2022",
 		"module": "esnext",
-		"types": ["@types/node"],
+		"types": ["@types/node", "tsdown-plugin-worker/types"],
 		"skipLibCheck": true,
 		"useDefineForClassFields": true,
 		"strictPropertyInitialization": false,

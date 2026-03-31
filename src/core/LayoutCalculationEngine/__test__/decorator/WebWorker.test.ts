@@ -31,9 +31,12 @@ type EngineMock = LayoutCalculationEngine<
 	fromSnapshot: ReturnType<typeof vi.fn>;
 };
 
+type WorkerConstructorLike = {
+	new (options?: { name?: string }): Worker;
+};
+
 class FakeWorker {
-	public url: URL;
-	public options?: WorkerOptions;
+	public options?: { name?: string };
 
 	public static instances: FakeWorker[] = [];
 	public static constructionAttempts = 0;
@@ -54,9 +57,8 @@ class FakeWorker {
 
 	public lastMessage?: unknown;
 
-	constructor(url: URL, options?: WorkerOptions) {
+	constructor(options?: { name?: string }) {
 		FakeWorker.constructionAttempts += 1;
-		this.url = url;
 		this.options = options;
 
 		if (FakeWorker.constructShouldThrow) {
@@ -86,7 +88,7 @@ class FakeWorker {
 	}
 }
 
-const WORKER_PATH = './layout.worker.ts';
+const IMPORTED_WORKER = FakeWorker as unknown as WorkerConstructorLike;
 
 const createInternalState = (
 	overrides: Partial<TestReturn> = {},
@@ -236,7 +238,7 @@ describe('WebWorker', () => {
 	beforeEach(() => {
 		faker.seed(FAKER_SEED);
 		FakeWorker.reset();
-		vi.stubGlobal('Worker', FakeWorker);
+		vi.stubGlobal('Worker', class AvailableWorker {});
 	});
 
 	afterEach(() => {
@@ -248,7 +250,7 @@ describe('WebWorker', () => {
 	test('snapshot() delegates to engine.snapshot()', () => {
 		const snapshot = createSnapshot();
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		expect(worker.snapshot()).toBe(snapshot);
 		expect(engine.snapshot).toHaveBeenCalledTimes(1);
@@ -257,7 +259,7 @@ describe('WebWorker', () => {
 	test('fromSnapshot() delegates to engine.fromSnapshot()', () => {
 		const snapshot = createSnapshot();
 		const engine = createEngineMock();
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		worker.fromSnapshot(snapshot);
 
@@ -271,7 +273,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit(), createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		const result = await worker.append(items);
 
@@ -291,7 +293,7 @@ describe('WebWorker', () => {
 
 		engine.sort.mockResolvedValue(sorted);
 
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 		const result = await worker.sort(source);
 
 		expect(engine.sort).toHaveBeenCalledTimes(1);
@@ -299,7 +301,7 @@ describe('WebWorker', () => {
 		expect(result).toBe(sorted);
 	});
 
-	test('append() lazily creates worker, sends append payload, syncs engine from worker snapshot and returns its internal state', async () => {
+	test('append() lazily creates imported worker, sends append payload, syncs engine from worker snapshot and returns its internal state', async () => {
 		const initialSnapshot = createSnapshot();
 		const nextSnapshot = createSnapshot();
 		const items = [createSourceUnit(), createSourceUnit()];
@@ -325,7 +327,7 @@ describe('WebWorker', () => {
 			});
 		};
 
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 		const result = await worker.append(items);
 
 		expect(FakeWorker.constructionAttempts).toBe(1);
@@ -333,8 +335,7 @@ describe('WebWorker', () => {
 
 		const [instance] = FakeWorker.instances;
 
-		expect(instance.options).toEqual({ type: 'module' });
-		expect(String(instance.url)).toContain('layout.worker.ts');
+		expect(instance.options).toBeUndefined();
 		expect(instance.postMessage).toHaveBeenCalledTimes(1);
 		expect(instance.postMessage).toHaveBeenCalledWith({
 			id: 1,
@@ -376,7 +377,7 @@ describe('WebWorker', () => {
 			});
 		};
 
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 		const result = await worker.sort(source);
 
 		expect(FakeWorker.constructionAttempts).toBe(1);
@@ -431,7 +432,7 @@ describe('WebWorker', () => {
 			});
 		};
 
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		await worker.append(items);
 		await worker.sort(source);
@@ -463,7 +464,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		FakeWorker.onPostMessage = (instance) => {
 			instance.emitMessageError();
@@ -482,7 +483,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const source = createInternalState();
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		FakeWorker.onPostMessage = (instance) => {
 			instance.emitError(new Error('sort failed'));
@@ -501,7 +502,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		FakeWorker.onPostMessage = (instance, message) => {
 			const request = message as { id: number };
@@ -529,7 +530,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		FakeWorker.onPostMessage = (instance, message) => {
 			const request = message as { id: number };
@@ -557,7 +558,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		FakeWorker.onPostMessage = (instance, message) => {
 			const request = message as { id: number };
@@ -600,7 +601,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		FakeWorker.onPostMessage = () => {
 			// Keep request pending intentionally
@@ -624,7 +625,7 @@ describe('WebWorker', () => {
 		const snapshot = createSnapshot();
 		const items = [createSourceUnit(), createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		worker.enable();
 
@@ -650,7 +651,7 @@ describe('WebWorker', () => {
 
 	test('enable() recreates worker after disable()', () => {
 		const engine = createEngineMock();
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		worker.enable();
 		expect(worker.workerDisabled).toBe(false);
@@ -680,7 +681,7 @@ describe('WebWorker', () => {
 
 		FakeWorker.constructShouldThrow = true;
 
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		const appendResult = await worker.append(items);
 		const sortResult = await worker.sort(source);
@@ -708,7 +709,7 @@ describe('WebWorker', () => {
 		const itemsA = [createSourceUnit()];
 		const itemsB = [createSourceUnit()];
 		const engine = createEngineMock(snapshot);
-		const worker = new WebWorker(engine, WORKER_PATH);
+		const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 		let resolveFirst: (() => void) | undefined;
 
@@ -750,7 +751,7 @@ describe('WebWorker', () => {
 				async (items) => {
 					const snapshot = createSnapshot();
 					const engine = createEngineMock(snapshot);
-					const worker = new WebWorker(engine, WORKER_PATH);
+					const worker = new WebWorker(engine, IMPORTED_WORKER);
 
 					const result = await worker.append(items);
 
@@ -782,7 +783,7 @@ describe('WebWorker', () => {
 					const engine = createEngineMock();
 					engine.sort.mockResolvedValue(sortedItems);
 
-					const worker = new WebWorker(engine, WORKER_PATH);
+					const worker = new WebWorker(engine, IMPORTED_WORKER);
 					const result = await worker.sort(source);
 
 					expect(engine.sort).toHaveBeenCalledTimes(1);

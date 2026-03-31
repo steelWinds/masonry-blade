@@ -10,7 +10,19 @@ import { FAKER_SEED } from 'tests/constants';
 
 const WORKER_MODULE_PATH =
 	'src/core/LayoutCalculationEngine/runtime/Matrix/MatrixWorker.worker.ts';
-const INLINE_MATRIX_WORKER_QUERY = 'masonry-blade-worker=1';
+
+const bindLayoutWorkerMock = vi.hoisted(() => vi.fn());
+
+vi.mock('src/core/LayoutCalculationEngine', async () => {
+	const actual = await vi.importActual<
+		typeof import('src/core/LayoutCalculationEngine')
+	>('src/core/LayoutCalculationEngine');
+
+	return {
+		...actual,
+		bindLayoutWorker: bindLayoutWorkerMock,
+	};
+});
 
 type MatrixInternal<T = undefined> = {
 	_order: Uint32Array;
@@ -26,11 +38,6 @@ type MatrixInternal<T = undefined> = {
 type TestMeta = {
 	label: string;
 	version?: number;
-};
-
-type WorkerGlobalLike = {
-	onmessage?: (event: MessageEvent<unknown>) => Promise<void>;
-	postMessage: ReturnType<typeof vi.fn>;
 };
 
 const serializeMatrix = (
@@ -127,65 +134,20 @@ const snapshotArbitrary: fc.Arbitrary<Readonly<MatrixSnapshot<TestMeta>>> = fc
 describe('matrix worker entry', () => {
 	beforeEach(() => {
 		vi.resetModules();
+		bindLayoutWorkerMock.mockReset();
 	});
 
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 	});
 
-	test('does not bind layout worker when the inline worker query flag is missing', async () => {
-		class FakeWorkerGlobalScope {
-			public onmessage?: (event: MessageEvent<unknown>) => Promise<void>;
-			public readonly postMessage = vi.fn();
-		}
+	test('calls bindLayoutWorker once on module evaluation', async () => {
+		const module = await import(WORKER_MODULE_PATH);
 
-		const workerGlobal = new FakeWorkerGlobalScope() as WorkerGlobalLike;
-
-		vi.stubGlobal('WorkerGlobalScope', FakeWorkerGlobalScope);
-		vi.stubGlobal('self', workerGlobal);
-
-		await import(WORKER_MODULE_PATH);
-
-		expect(workerGlobal.onmessage).toBeUndefined();
-	});
-
-	test('binds layout worker in inline worker context only', async () => {
-		class FakeWorkerGlobalScope {
-			public onmessage?: (event: MessageEvent<unknown>) => Promise<void>;
-			public readonly postMessage = vi.fn();
-		}
-
-		const NativeURL = URL;
-		const workerGlobal = new FakeWorkerGlobalScope() as WorkerGlobalLike;
-		const InlineWorkerURL = class extends NativeURL {
-			constructor(url: string | URL, base?: string | URL) {
-				super(url, base);
-
-				if (String(url).includes('MatrixWorker.worker.ts')) {
-					this.searchParams.set(
-						'masonry-blade-worker',
-						INLINE_MATRIX_WORKER_QUERY.split('=')[1],
-					);
-				}
-			}
-		};
-
-		vi.stubGlobal('URL', InlineWorkerURL);
-		vi.stubGlobal('WorkerGlobalScope', FakeWorkerGlobalScope);
-		vi.stubGlobal('self', workerGlobal);
-
-		await import(WORKER_MODULE_PATH);
-
-		expect(workerGlobal.onmessage).toBeTypeOf('function');
-	});
-
-	test('getInlineMatrixWorkerURL adds the inline worker query flag', async () => {
-		const { getInlineMatrixWorkerURL } = await import(WORKER_MODULE_PATH);
-		const workerUrl = new URL(getInlineMatrixWorkerURL());
-
-		expect(workerUrl.searchParams.get('masonry-blade-worker')).toBe('1');
-		expect(workerUrl.pathname).toMatch(/MatrixWorker\.worker\.ts$/);
+		expect(bindLayoutWorkerMock).toHaveBeenCalledTimes(1);
+		expect(bindLayoutWorkerMock).toHaveBeenCalledWith({
+			restore: module.restoreMatrixFromSnapshot,
+		});
 	});
 
 	test('restoreMatrixFromSnapshot recreates matrix snapshots for arbitrary valid inputs', async () => {
