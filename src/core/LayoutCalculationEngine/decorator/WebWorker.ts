@@ -10,12 +10,16 @@ import type {
 } from '../contract';
 import { WEB_WORKER_ERRORS, WebWorkerError } from '../errors/WebWorkerError';
 
+type WorkerConstructor = {
+	new (options?: { name?: string }): Worker;
+};
+
 export class WebWorker<
 	Return,
 	Snapshot extends LayoutSnapshot<Return>,
 	Unit extends LayoutComputedUnit,
 > implements LayoutCalculationEngine<Return, Snapshot, Unit> {
-	private readonly _path: string;
+	private readonly _workerSource: WorkerConstructor;
 
 	private _engine: LayoutCalculationEngine<Return, Snapshot, Unit>;
 	private _worker?: Worker;
@@ -25,10 +29,10 @@ export class WebWorker<
 
 	constructor(
 		engine: LayoutCalculationEngine<Return, Snapshot, Unit>,
-		path: string,
+		workerSource: WorkerConstructor,
 	) {
 		this._engine = engine;
-		this._path = path;
+		this._workerSource = workerSource;
 	}
 
 	private _ensureWorker(): void {
@@ -42,9 +46,7 @@ export class WebWorker<
 		}
 
 		try {
-			this._worker = new Worker(new URL(this._path, import.meta.url), {
-				type: 'module',
-			});
+			this._worker = new this._workerSource();
 		} catch {
 			this._workerDisabled = true;
 		}

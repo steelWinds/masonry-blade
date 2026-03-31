@@ -1,6 +1,6 @@
 {
 	"name": "masonry-blade",
-	"version": "2.0.2",
+	"version": "2.0.3",
 	"private": false,
 	"description": "masonry-blade is a tiny, fast, and extensible engine for masonry grid calculation with zero dependencies 🤤",
 	"keywords": [
@@ -64,6 +64,7 @@
 		"oxlint-tsgolint": "^0.17.1",
 		"publint": "^0.3.18",
 		"tsdown": "^0.21.4",
+		"tsdown-plugin-worker": "^0.1.9",
 		"tsx": "^4.21.0",
 		"typescript": "~5.9.3",
 		"unplugin-remove": "^1.0.3",

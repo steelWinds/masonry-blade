@@ -1,5 +1,3 @@
-/// <reference lib="webworker" />
-
 import {
 	Matrix,
 	type MatrixComputedUnit,
@@ -8,7 +6,7 @@ import {
 	bindLayoutWorker,
 } from 'src/core/LayoutCalculationEngine';
 
-const restoreMatrixFromSnapshot = <Meta = undefined>(
+export const restoreMatrixFromSnapshot = <Meta = undefined>(
 	snapshot: Readonly<MatrixSnapshot<Meta>>,
 ): Matrix<Meta> => {
 	const matrix = new Matrix<Meta>(
