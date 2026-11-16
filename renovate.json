@@ -2,7 +2,9 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:recommended", "security:minimumReleaseAgeNpm"],
 	"configMigration": true,
-	"dependencyDashboard": true,
+	"dependencyDashboard": {
+		"enabled": true
+	},
 	"timezone": "Asia/Yakutsk",
 
 	"prConcurrentLimit": 3,
